@@ -195,44 +195,55 @@ func ProcessUpdateForUsage(ctx context.Context, db *goqu.Database, update *Updat
 		return err
 	}
 
-	usagesE := db.From("usages").
-		Select(goqu.C("usage")).
-		Where(goqu.And(
-			goqu.I("resource_type_id").Eq(update.ResourceType.ID),
-			goqu.I("user_plan_id").Eq(userPlan.ID),
-		)).
-		Limit(1).
-		Executor()
-
-	var usageValue float64
-	if _, err := usagesE.ScanValContext(ctx, &usageValue); err != nil {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
 		return err
 	}
 
-	switch update.UpdateOperation.Name {
-	case UpdateTypeSet:
-		usageValue = update.Value
-	case UpdateTypeAdd:
-		usageValue = usageValue + update.Value
-	default:
-		return fmt.Errorf("invalid update type: %s", update.UpdateOperation.Name)
-	}
+	if err = tx.Wrap(func() error {
+		usagesE := tx.From("usages").
+			Select(goqu.C("usage")).
+			Where(goqu.And(
+				goqu.I("resource_type_id").Eq(update.ResourceType.ID),
+				goqu.I("user_plan_id").Eq(userPlan.ID),
+			)).
+			Limit(1).
+			Executor()
 
-	upsertE := db.Insert("usages").Rows(
-		goqu.Record{
-			"usage":            usageValue,
-			"resource_type_id": update.ResourceType.ID,
-			"user_plan_id":     userPlan.ID,
-			"last_modified_by": "de",
-			"created_by":       "de",
-		},
-	).
-		OnConflict(goqu.DoUpdate("resource_type_id", goqu.C("usage").Set(usageValue))).
-		OnConflict(goqu.DoUpdate("user_plan_id", goqu.C("usage").Set(usageValue))).
-		Executor()
+		var usageValue float64
+		if _, err := usagesE.ScanValContext(ctx, &usageValue); err != nil {
+			return err
+		}
 
-	_, err = upsertE.ExecContext(ctx)
-	if err != nil {
+		switch update.UpdateOperation.Name {
+		case UpdateTypeSet:
+			usageValue = update.Value
+		case UpdateTypeAdd:
+			usageValue = usageValue + update.Value
+		default:
+			return fmt.Errorf("invalid update type: %s", update.UpdateOperation.Name)
+		}
+
+		upsertE := tx.Insert("usages").Rows(
+			goqu.Record{
+				"usage":            usageValue,
+				"resource_type_id": update.ResourceType.ID,
+				"user_plan_id":     userPlan.ID,
+				"last_modified_by": "de",
+				"created_by":       "de",
+			},
+		).
+			OnConflict(goqu.DoUpdate("resource_type_id", goqu.C("usage").Set(usageValue))).
+			OnConflict(goqu.DoUpdate("user_plan_id", goqu.C("usage").Set(usageValue))).
+			Executor()
+
+		_, err = upsertE.ExecContext(ctx)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}); err != nil {
 		return err
 	}
 
@@ -244,42 +255,54 @@ func ProcessUpdateForQuota(ctx context.Context, db *goqu.Database, update *Updat
 		err        error
 		quotaValue float64
 	)
+
 	userPlan, err := GetActiveUserPlan(ctx, db, update.User.Username)
 	if err != nil {
 		return err
 	}
 
-	quotasE := db.From("quotas").
-		Select(goqu.C("quota")).
-		Where(goqu.And(
-			goqu.I("resource_type_id").Eq(update.ResourceType.ID),
-			goqu.I("user_plan_id").Eq(userPlan.ID),
-		)).
-		Limit(1).
-		Executor()
-
-	if _, err := quotasE.ScanValContext(ctx, &quotaValue); err != nil {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
 		return err
 	}
 
-	switch update.UpdateOperation.Name {
-	case UpdateTypeSet:
-		quotaValue = update.Value
-	case UpdateTypeAdd:
-		quotaValue = quotaValue + update.Value
-	default:
-		return fmt.Errorf("invalid update type: %s", update.UpdateOperation.Name)
-	}
+	if err = tx.Wrap(func() error {
+		quotasE := tx.From("quotas").
+			Select(goqu.C("quota")).
+			Where(goqu.And(
+				goqu.I("resource_type_id").Eq(update.ResourceType.ID),
+				goqu.I("user_plan_id").Eq(userPlan.ID),
+			)).
+			Limit(1).
+			Executor()
 
-	upsertE := db.Insert("quotas").Rows(
-		goqu.Record{},
-	).
-		OnConflict(goqu.DoUpdate("resource_type_id", goqu.C("quota").Set(quotaValue))).
-		OnConflict(goqu.DoUpdate("user_plan_id", goqu.C("quota").Set(quotaValue))).
-		Executor()
+		if _, err := quotasE.ScanValContext(ctx, &quotaValue); err != nil {
+			return err
+		}
 
-	_, err = upsertE.ExecContext(ctx)
-	if err != nil {
+		switch update.UpdateOperation.Name {
+		case UpdateTypeSet:
+			quotaValue = update.Value
+		case UpdateTypeAdd:
+			quotaValue = quotaValue + update.Value
+		default:
+			return fmt.Errorf("invalid update type: %s", update.UpdateOperation.Name)
+		}
+
+		upsertE := tx.Insert("quotas").Rows(
+			goqu.Record{},
+		).
+			OnConflict(goqu.DoUpdate("resource_type_id", goqu.C("quota").Set(quotaValue))).
+			OnConflict(goqu.DoUpdate("user_plan_id", goqu.C("quota").Set(quotaValue))).
+			Executor()
+
+		_, err = upsertE.ExecContext(ctx)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}); err != nil {
 		return err
 	}
 
