@@ -27,9 +27,10 @@ import (
 	_ "expvar"
 
 	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
+	_ "github.com/lib/pq"
 )
 
-const serviceName = "qms-v2"
+const serviceName = "subscriptions"
 
 var log = logging.Log.WithFields(logrus.Fields{"package": "main"})
 
@@ -49,7 +50,7 @@ func main() {
 		reconnectWait  = flag.Int("reconnect-wait", gotelnats.DefaultReconnectWait, "Seconds to wait between reconnection attempts to NATS")
 		natsSubject    = flag.String("subject", "cyverse.qms.>", "NATS subject to subscribe to")
 		natsQueue      = flag.String("queue", "cyverse.qms", "Name of the NATS queue to use")
-		envPrefix      = flag.String("env-prefix", "QMS_", "The prefix for environment variables")
+		envPrefix      = flag.String("env-prefix", "SBS_", "The prefix for environment variables")
 		reportOverages = flag.Bool("report-overages", true, "Allows the overages feature to effectively be shut down")
 		logLevel       = flag.String("log-level", "debug", "One of trace, debug, info, warn, error, fatal, or panic.")
 		listenPort     = flag.Int("port", 60000, "The port the service listens on for requests")
@@ -79,17 +80,17 @@ func main() {
 	}
 	log.Infof("Done reading config from %s", *configPath)
 
-	// Make sure the db.uri URL is parseable
-	if _, err = url.Parse(config.String("db.uri")); err != nil {
-		log.Fatal(errors.Wrap(err, "Can't parse db.uri in the config file"))
-	}
-
-	dbURI := config.String("db.uri")
+	dbURI := config.String("database.uri")
 	if dbURI == "" {
 		log.Fatal("db.uri must be set in the configuration file")
 	}
 
-	userSuffix := config.String("users.domain")
+	// Make sure the db.uri URL is parseable
+	if _, err = url.Parse(dbURI); err != nil {
+		log.Fatal(errors.Wrap(err, "Can't parse db.uri in the config file"))
+	}
+
+	userSuffix := config.String("username.suffix")
 	if userSuffix == "" {
 		log.Fatal("users.domain must be set in the configuration file")
 	}
@@ -148,7 +149,7 @@ func main() {
 
 	app := New(natsConn, dbconn, *natsQueue, *natsSubject, userSuffix).Init()
 	for _, sub := range app.subscriptions {
-		log.Info("added handler for subject %s on queue %s", sub.Subject, sub.Queue)
+		log.Infof("added handler for subject %s on queue %s", sub.Subject, sub.Queue)
 	}
 
 	srv := fmt.Sprintf(":%s", strconv.Itoa(*listenPort))

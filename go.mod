@@ -14,6 +14,7 @@ require (
 	github.com/doug-martin/goqu/v9 v9.18.0
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/knadh/koanf v1.4.1
+	github.com/lib/pq v1.10.1
 	github.com/nats-io/nats.go v1.14.0
 	github.com/pkg/errors v0.9.1
 	github.com/samber/lo v1.33.0

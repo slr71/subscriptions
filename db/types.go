@@ -52,8 +52,13 @@ type UserPlan struct {
 	ID                 string    `db:"id" goqu:"defaultifempty"`
 	EffectiveStartDate time.Time `db:"effective_start_date"`
 	EffectiveEndDate   time.Time `db:"effective_end_date"`
+	UserID             string    `db:"user_id"`
 	User               User      `db:"users"`
-	Plan               Plan      `db:"plans"`
+	PlanID             string    `db:"plan_id"`
+	CreatedBy          string    `db:"created_by"`
+	CreatedAt          time.Time `db:"created_at" goqu:"defaultifempty"`
+	LastModifiedBy     string    `db:"last_modified_by"`
+	LastModifiedAt     string    `db:"last_modified_at" goqu:"defaultifempty"`
 }
 
 type Plan struct {

@@ -4,13 +4,18 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cyverse-de/go-mod/logging"
 	"github.com/doug-martin/goqu/v9"
+	"github.com/doug-martin/goqu/v9/exec"
+	"github.com/sirupsen/logrus"
 
 	"github.com/jmoiron/sqlx"
 )
 
+var log = logging.Log.WithFields(logrus.Fields{"package": "db"})
+
 func New(dbconn *sqlx.DB) *goqu.Database {
-	return goqu.New("postgres", dbconn)
+	return goqu.New("postgresql", dbconn)
 }
 
 type QuerySettings struct {
@@ -134,7 +139,7 @@ func GetUserID(ctx context.Context, dbconn *goqu.Database, username string) (str
 func GetActiveUserPlan(ctx context.Context, db *goqu.Database, username string) (*UserPlan, error) {
 	var (
 		err    error
-		result *UserPlan
+		result UserPlan
 	)
 
 	userPlansT := goqu.T("user_plans")
@@ -144,6 +149,17 @@ func GetActiveUserPlan(ctx context.Context, db *goqu.Database, username string) 
 	currTS := goqu.L("CURRENT_TIMESTAMP")
 
 	query := db.From(userPlansT).
+		Select(
+			userPlansT.Col("id"),
+			"user_id",
+			"plan_id",
+			"effective_start_date",
+			"effective_end_date",
+			"created_by",
+			"created_at",
+			"last_modified_by",
+			"last_modified_at",
+		).
 		Join(usersT, goqu.On(goqu.I("user_plans.user_id").Eq(goqu.I("users.id")))).
 		Where(goqu.And(
 			goqu.I("users.username").Eq(username),
@@ -156,11 +172,13 @@ func GetActiveUserPlan(ctx context.Context, db *goqu.Database, username string) 
 		Limit(1).
 		Executor()
 
-	if _, err = query.ScanStructContext(ctx, result); err != nil {
+	log.Debug(query.ToSQL())
+
+	if _, err = query.ScanStructContext(ctx, &result); err != nil {
 		return nil, err
 	}
 
-	return result, nil
+	return &result, nil
 }
 
 func AddUserUpdate(ctx context.Context, db *goqu.Database, update *Update) (*Update, error) {
@@ -189,18 +207,25 @@ func AddUserUpdate(ctx context.Context, db *goqu.Database, update *Update) (*Upd
 }
 
 func ProcessUpdateForUsage(ctx context.Context, db *goqu.Database, update *Update) error {
+	log = log.WithFields(logrus.Fields{"context": "usage update", "user": update.User.Username})
+
+	log.Debug("before getting active user plan")
 	// Look up the currently active user plan, adding a default plan if one doesn't exist already.
 	userPlan, err := GetActiveUserPlan(ctx, db, update.User.Username)
 	if err != nil {
 		return err
 	}
+	log.Debugf("after getting active user plan %s", userPlan.ID)
 
+	log.Debug("beginning transaction")
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
+	log.Debug("after beginning transaction")
 
 	if err = tx.Wrap(func() error {
+		log.Debug("getting current usage")
 		usagesE := tx.From("usages").
 			Select(goqu.C("usage")).
 			Where(goqu.And(
@@ -211,9 +236,11 @@ func ProcessUpdateForUsage(ctx context.Context, db *goqu.Database, update *Updat
 			Executor()
 
 		var usageValue float64
-		if _, err := usagesE.ScanValContext(ctx, &usageValue); err != nil {
+		usageFound, err := usagesE.ScanValContext(ctx, &usageValue)
+		if err != nil {
 			return err
 		}
+		log.Debugf("done getting current usage of %f", usageValue)
 
 		switch update.UpdateOperation.Name {
 		case UpdateTypeSet:
@@ -223,24 +250,36 @@ func ProcessUpdateForUsage(ctx context.Context, db *goqu.Database, update *Updat
 		default:
 			return fmt.Errorf("invalid update type: %s", update.UpdateOperation.Name)
 		}
+		log.Debugf("new usage value is %f", usageValue)
 
-		upsertE := tx.Insert("usages").Rows(
-			goqu.Record{
-				"usage":            usageValue,
-				"resource_type_id": update.ResourceType.ID,
-				"user_plan_id":     userPlan.ID,
-				"last_modified_by": "de",
-				"created_by":       "de",
-			},
-		).
-			OnConflict(goqu.DoUpdate("resource_type_id", goqu.C("usage").Set(usageValue))).
-			OnConflict(goqu.DoUpdate("user_plan_id", goqu.C("usage").Set(usageValue))).
-			Executor()
+		log.Debug("upserting new usage value")
+		updateRecord := goqu.Record{
+			"usage":            usageValue,
+			"resource_type_id": update.ResourceType.ID,
+			"user_plan_id":     userPlan.ID,
+			"last_modified_by": "de",
+			"created_by":       "de",
+		}
+
+		var upsertE exec.QueryExecutor
+		if !usageFound {
+			upsertE = tx.Insert("usages").Rows(updateRecord).Executor()
+		} else {
+			upsertE = tx.Update("usages").Set(updateRecord).Where(
+				goqu.And(
+					goqu.I("resource_type_id").Eq(update.ResourceType.ID),
+					goqu.I("user_plan_id").Eq(userPlan.ID),
+				),
+			).Executor()
+		}
+
+		log.Info(upsertE.ToSQL())
 
 		_, err = upsertE.ExecContext(ctx)
 		if err != nil {
 			return err
 		}
+		log.Debug("done upserting new value")
 
 		return nil
 	}); err != nil {

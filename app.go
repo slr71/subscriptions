@@ -183,6 +183,7 @@ func (a *App) AddUserUpdateHandler(subject, reply string, request *qms.AddUpdate
 
 	// Avoid duplicating a lot of error reporting code.
 	sendError := func(ctx context.Context, response *qms.AddUpdateResponse, err error) {
+		log.Error(err)
 		response.Error = natsError(ctx, err)
 		if err = gotelnats.PublishResponse(ctx, a.natsConn, reply, response); err != nil {
 			log.Error(err)
@@ -201,17 +202,21 @@ func (a *App) AddUserUpdateHandler(subject, reply string, request *qms.AddUpdate
 
 	// Get the userID if it's not provided
 	if request.Update.User.Uuid == "" {
+		log.Infof("getting user ID for %s", username)
 		userID, err = db.GetUserID(ctx, d, username)
 		if err != nil {
 			sendError(ctx, response, err)
 			return
 		}
+		log.Infof("user ID for %s is %s", username, userID)
 	} else {
 		userID = request.Update.User.Uuid
+		log.Infof("user ID from request is %s", userID)
 	}
 
 	// Get the resource type id if it's not provided.
 	if request.Update.ResourceType.Uuid == "" {
+		log.Infof("getting resource type id for resource '%s'", request.Update.ResourceType.Name)
 		resourceTypeID, err = db.GetResourceTypeID(
 			ctx,
 			d,
@@ -222,12 +227,15 @@ func (a *App) AddUserUpdateHandler(subject, reply string, request *qms.AddUpdate
 			sendError(ctx, response, err)
 			return
 		}
+		log.Infof("resource type id for resource %s is '%s'", request.Update.ResourceType.Name, resourceTypeID)
 	} else {
 		resourceTypeID = request.Update.ResourceType.Uuid
+		log.Infof("resource type id from request is %s", resourceTypeID)
 	}
 
 	// Get the operation id if it's not provided.
 	if request.Update.Operation.Uuid == "" {
+		log.Infof("getting operation ID for %s", request.Update.Operation.Name)
 		operationID, err = db.GetOperationID(
 			ctx,
 			d,
@@ -237,8 +245,10 @@ func (a *App) AddUserUpdateHandler(subject, reply string, request *qms.AddUpdate
 			sendError(ctx, response, err)
 			return
 		}
+		log.Infof("operation ID for %s is %s", request.Update.Operation.Name, operationID)
 	} else {
 		operationID = request.Update.Operation.Uuid
+		log.Infof("using operation ID %s from request", request.Update.Operation.Uuid)
 	}
 
 	// construct the model.Update
@@ -262,12 +272,14 @@ func (a *App) AddUserUpdateHandler(subject, reply string, request *qms.AddUpdate
 			},
 		}
 
+		log.Info("adding update to the database")
 		// Add the update to the database.
 		update, err = db.AddUserUpdate(ctx, d, mUpdate)
 		if err != nil {
 			sendError(ctx, response, err)
 			return
 		}
+		log.Info("done adding update to the database")
 
 		log.Infof("value type %s", update.ValueType)
 
