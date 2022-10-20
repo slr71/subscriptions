@@ -41,7 +41,7 @@ func WithQueryOffset(offset uint) QueryOption {
 	}
 }
 
-func UserUpdates(ctx context.Context, dbconn *goqu.Database, username string, opts ...QueryOption) ([]Update, error) {
+func UserUpdates(ctx context.Context, dbconn GoquDatabase, username string, opts ...QueryOption) ([]Update, error) {
 	querySettings := &QuerySettings{}
 	for _, opt := range opts {
 		opt(querySettings)
@@ -81,7 +81,7 @@ func UserUpdates(ctx context.Context, dbconn *goqu.Database, username string, op
 	return results, nil
 }
 
-func GetResourceTypeID(ctx context.Context, dbconn *goqu.Database, name, unit string) (string, error) {
+func GetResourceTypeID(ctx context.Context, dbconn GoquDatabase, name, unit string) (string, error) {
 	rtT := goqu.T("resource_types")
 	query := goqu.From(rtT).
 		Select("id").
@@ -100,7 +100,7 @@ func GetResourceTypeID(ctx context.Context, dbconn *goqu.Database, name, unit st
 	return result, nil
 }
 
-func GetOperationID(ctx context.Context, dbconn *goqu.Database, name string) (string, error) {
+func GetOperationID(ctx context.Context, dbconn GoquDatabase, name string) (string, error) {
 	opT := goqu.T("update_operations")
 	query := goqu.From(opT).
 		Select("id").
@@ -118,7 +118,7 @@ func GetOperationID(ctx context.Context, dbconn *goqu.Database, name string) (st
 	return result, nil
 }
 
-func GetUserID(ctx context.Context, dbconn *goqu.Database, username string) (string, error) {
+func GetUserID(ctx context.Context, dbconn GoquDatabase, username string) (string, error) {
 	usersT := goqu.T("users")
 	query := goqu.From(usersT).
 		Select("id").
@@ -136,7 +136,7 @@ func GetUserID(ctx context.Context, dbconn *goqu.Database, username string) (str
 	return result, nil
 }
 
-func GetActiveUserPlan(ctx context.Context, db *goqu.Database, username string) (*UserPlan, error) {
+func GetActiveUserPlan(ctx context.Context, db GoquDatabase, username string) (*UserPlan, error) {
 	var (
 		err    error
 		result UserPlan
@@ -181,7 +181,7 @@ func GetActiveUserPlan(ctx context.Context, db *goqu.Database, username string) 
 	return &result, nil
 }
 
-func AddUserUpdate(ctx context.Context, db *goqu.Database, update *Update) (*Update, error) {
+func AddUserUpdate(ctx context.Context, db GoquDatabase, update *Update) (*Update, error) {
 	ds := db.Insert("updates").Rows(
 		goqu.Record{
 			"value_type":          update.ValueType,
@@ -209,14 +209,6 @@ func AddUserUpdate(ctx context.Context, db *goqu.Database, update *Update) (*Upd
 func ProcessUpdateForUsage(ctx context.Context, db *goqu.Database, update *Update) error {
 	log = log.WithFields(logrus.Fields{"context": "usage update", "user": update.User.Username})
 
-	log.Debug("before getting active user plan")
-	// Look up the currently active user plan, adding a default plan if one doesn't exist already.
-	userPlan, err := GetActiveUserPlan(ctx, db, update.User.Username)
-	if err != nil {
-		return err
-	}
-	log.Debugf("after getting active user plan %s", userPlan.ID)
-
 	log.Debug("beginning transaction")
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
@@ -225,6 +217,13 @@ func ProcessUpdateForUsage(ctx context.Context, db *goqu.Database, update *Updat
 	log.Debug("after beginning transaction")
 
 	if err = tx.Wrap(func() error {
+		log.Debug("before getting active user plan")
+		userPlan, err := GetActiveUserPlan(ctx, tx, update.User.Username)
+		if err != nil {
+			return err
+		}
+		log.Debugf("after getting active user plan %s", userPlan.ID)
+
 		log.Debug("getting current usage")
 		usagesE := tx.From("usages").
 			Select(goqu.C("usage")).
