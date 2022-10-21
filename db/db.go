@@ -443,6 +443,41 @@ func (d *Database) AddUserUpdate(ctx context.Context, update *Update, opts ...Qu
 	return update, nil
 }
 
+func (d *Database) GetCurrentUsage(ctx context.Context, resourceTypeID, userPlanID string, opts ...QueryOption) (float64, bool, error) {
+	var (
+		err error
+		db  GoquDatabase
+	)
+
+	querySettings := &QuerySettings{}
+	for _, opt := range opts {
+		opt(querySettings)
+	}
+
+	if querySettings.tx != nil {
+		db = querySettings.tx
+	} else {
+		db = d.goquDB
+	}
+
+	usagesE := db.From("usages").
+		Select(goqu.C("usage")).
+		Where(goqu.And(
+			goqu.I("resource_type_id").Eq(resourceTypeID),
+			goqu.I("user_plan_id").Eq(userPlanID),
+		)).
+		Limit(1).
+		Executor()
+
+	var usageValue float64
+	usageFound, err := usagesE.ScanValContext(ctx, &usageValue)
+	if err != nil {
+		return usageValue, false, err
+	}
+
+	return usageValue, usageFound, nil
+}
+
 func (d *Database) ProcessUpdateForUsage(ctx context.Context, update *Update) error {
 	log = log.WithFields(logrus.Fields{"context": "usage update", "user": update.Username})
 	db := d.fullDB
@@ -461,21 +496,8 @@ func (d *Database) ProcessUpdateForUsage(ctx context.Context, update *Update) er
 		}
 		log.Debugf("after getting active user plan %s", userPlan.ID)
 
-		log.Debugf("resource type id %s", update.ResourceTypeID)
-		log.Debugf("user_plan_id %s", userPlan.ID)
-
 		log.Debug("getting current usage")
-		usagesE := tx.From("usages").
-			Select(goqu.C("usage")).
-			Where(goqu.And(
-				goqu.I("resource_type_id").Eq(update.ResourceTypeID),
-				goqu.I("user_plan_id").Eq(userPlan.ID),
-			)).
-			Limit(1).
-			Executor()
-
-		var usageValue float64
-		usageFound, err := usagesE.ScanValContext(ctx, &usageValue)
+		usageValue, usageFound, err := d.GetCurrentUsage(ctx, update.ResourceTypeID, userPlan.ID, WithTX(tx))
 		if err != nil {
 			return err
 		}
