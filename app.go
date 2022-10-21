@@ -8,7 +8,6 @@ import (
 	"github.com/cyverse-de/go-mod/gotelnats"
 	"github.com/cyverse-de/go-mod/pbinit"
 	"github.com/cyverse-de/p/go/qms"
-	"github.com/cyverse-de/p/go/svcerror"
 	"github.com/cyverse-de/subscriptions/db"
 	"github.com/jmoiron/sqlx"
 	"github.com/nats-io/nats.go"
@@ -69,10 +68,18 @@ func (a *App) Init() *App {
 	return a
 }
 
-func (a *App) validateUpdate(request *qms.AddUpdateRequest) (string, error) {
-	username := strings.TrimSuffix(request.Update.User.Username, a.userSuffix)
-	if username == "" {
+func (a *App) FixUsername(username string) (string, error) {
+	u := strings.TrimSuffix(username, a.userSuffix)
+	if u == "" {
 		return "", ErrInvalidUsername
+	}
+	return u, nil
+}
+
+func (a *App) validateUpdate(request *qms.AddUpdateRequest) (string, error) {
+	username, err := a.FixUsername(request.Update.User.Username)
+	if err != nil {
+		return "", err
 	}
 
 	if request.Update.ResourceType.Name == "" || !lo.Contains(
@@ -118,13 +125,20 @@ func (a *App) GetUserUpdatesHandler(subject, reply string, request *qms.UpdateLi
 	ctx, span := pbinit.InitQMSUpdateListRequest(request, subject)
 	defer span.End()
 
-	username := request.User.Username
-	if username == "" {
-		response.Error = gotelnats.InitServiceError(
-			ctx, err, &gotelnats.ErrorOptions{
-				ErrorCode: svcerror.ErrorCode_BAD_REQUEST,
-			},
-		)
+	// Avoid duplicating a lot of error reporting code.
+	sendError := func(ctx context.Context, response *qms.UpdateListResponse, err error) {
+		log.Error(err)
+		response.Error = natsError(ctx, err)
+		if err = gotelnats.PublishResponse(ctx, a.natsConn, reply, response); err != nil {
+			log.Error(err)
+		}
+	}
+
+	username, err := a.FixUsername(request.User.Username)
+	if err != nil {
+		sendError(ctx, response, err)
+		return
+
 	}
 
 	log = log.WithFields(logrus.Fields{"user": username})
@@ -133,12 +147,8 @@ func (a *App) GetUserUpdatesHandler(subject, reply string, request *qms.UpdateLi
 
 	mUpdates, err := d.UserUpdates(ctx, username)
 	if err != nil {
-		log.Error(err)
-		response.Error = gotelnats.InitServiceError(
-			ctx, err, &gotelnats.ErrorOptions{
-				ErrorCode: natsStatusCode(err),
-			},
-		)
+		sendError(ctx, response, err)
+		return
 	}
 
 	for _, mu := range mUpdates {
@@ -259,7 +269,7 @@ func (a *App) AddUserUpdateHandler(subject, reply string, request *qms.AddUpdate
 			ResourceTypeName:    request.Update.ResourceType.Name,
 			ResourceTypeUnit:    request.Update.ResourceType.Unit,
 			UserID:              userID,
-			Username:            request.Update.User.Username,
+			Username:            username,
 			UpdateOperationID:   operationID,
 			UpdateOperationName: request.Update.Operation.Name,
 		}

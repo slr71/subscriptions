@@ -371,7 +371,7 @@ func (d *Database) GetActiveUserPlan(ctx context.Context, username string, opts 
 
 	query := db.From(userPlansT).
 		Select(
-			userPlansT.Col("id"),
+			userPlansT.Col("id").As("id"),
 			"user_id",
 			"plan_id",
 			"effective_start_date",
@@ -460,6 +460,9 @@ func (d *Database) ProcessUpdateForUsage(ctx context.Context, update *Update) er
 			return err
 		}
 		log.Debugf("after getting active user plan %s", userPlan.ID)
+
+		log.Debugf("resource type id %s", update.ResourceTypeID)
+		log.Debugf("user_plan_id %s", userPlan.ID)
 
 		log.Debug("getting current usage")
 		usagesE := tx.From("usages").
