@@ -478,6 +478,45 @@ func (d *Database) GetCurrentUsage(ctx context.Context, resourceTypeID, userPlan
 	return usageValue, usageFound, nil
 }
 
+func (d *Database) GetCurrentQuota(ctx context.Context, resourceTypeID, userPlanID string, opts ...QueryOption) (float64, bool, error) {
+	var (
+		err        error
+		db         GoquDatabase
+		quotaValue float64
+	)
+
+	querySettings := &QuerySettings{}
+	for _, opt := range opts {
+		opt(querySettings)
+	}
+
+	if querySettings.tx != nil {
+		db = querySettings.tx
+	} else {
+		db = d.goquDB
+	}
+
+	quotasE := db.From("quotas").
+		Select(goqu.C("quota")).
+		Where(goqu.And(
+			goqu.I("resource_type_id").Eq(resourceTypeID),
+			goqu.I("user_plan_id").Eq(userPlanID),
+		)).
+		Limit(1).
+		Executor()
+
+	if _, err := quotasE.ScanValContext(ctx, &quotaValue); err != nil {
+		return quotaValue, false, err
+	}
+
+	quotaFound, err := quotasE.ScanValContext(ctx, &quotaValue)
+	if err != nil {
+		return quotaValue, false, err
+	}
+
+	return quotaValue, quotaFound, nil
+}
+
 func (d *Database) UpsertUsage(ctx context.Context, update bool, value float64, resourceTypeID, userPlanID string, opts ...QueryOption) error {
 	var (
 		err error
@@ -508,6 +547,53 @@ func (d *Database) UpsertUsage(ctx context.Context, update bool, value float64, 
 		upsertE = db.Insert("usages").Rows(updateRecord).Executor()
 	} else {
 		upsertE = db.Update("usages").Set(updateRecord).Where(
+			goqu.And(
+				goqu.I("resource_type_id").Eq(resourceTypeID),
+				goqu.I("user_plan_id").Eq(userPlanID),
+			),
+		).Executor()
+	}
+
+	log.Info(upsertE.ToSQL())
+
+	_, err = upsertE.ExecContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (d *Database) UpsertQuota(ctx context.Context, update bool, value float64, resourceTypeID, userPlanID string, opts ...QueryOption) error {
+	var (
+		err error
+		db  GoquDatabase
+	)
+
+	querySettings := &QuerySettings{}
+	for _, opt := range opts {
+		opt(querySettings)
+	}
+
+	if querySettings.tx != nil {
+		db = querySettings.tx
+	} else {
+		db = d.goquDB
+	}
+
+	updateRecord := goqu.Record{
+		"quota":            value,
+		"resource_type_id": resourceTypeID,
+		"user_plan_id":     userPlanID,
+		"create_by":        "de",
+		"last_modified_by": "de",
+	}
+
+	var upsertE exec.QueryExecutor
+	if !update {
+		upsertE = db.Insert("quotas").Rows(updateRecord).Executor()
+	} else {
+		upsertE = db.Update("quotas").Set(updateRecord).Where(
 			goqu.And(
 				goqu.I("resource_type_id").Eq(resourceTypeID),
 				goqu.I("user_plan_id").Eq(userPlanID),
@@ -577,17 +663,9 @@ func (d *Database) ProcessUpdateForUsage(ctx context.Context, update *Update) er
 }
 
 func (d *Database) ProcessUpdateForQuota(ctx context.Context, update *Update, opts ...QueryOption) error {
-	var (
-		err        error
-		quotaValue float64
-	)
+	var err error
 
 	db := d.fullDB
-
-	userPlan, err := d.GetActiveUserPlan(ctx, update.Username)
-	if err != nil {
-		return err
-	}
 
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
@@ -595,16 +673,13 @@ func (d *Database) ProcessUpdateForQuota(ctx context.Context, update *Update, op
 	}
 
 	if err = tx.Wrap(func() error {
-		quotasE := tx.From("quotas").
-			Select(goqu.C("quota")).
-			Where(goqu.And(
-				goqu.I("resource_type_id").Eq(update.ResourceTypeID),
-				goqu.I("user_plan_id").Eq(userPlan.ID),
-			)).
-			Limit(1).
-			Executor()
+		userPlan, err := d.GetActiveUserPlan(ctx, update.Username, WithTX(tx))
+		if err != nil {
+			return err
+		}
 
-		if _, err := quotasE.ScanValContext(ctx, &quotaValue); err != nil {
+		quotaValue, quotaFound, err := d.GetCurrentQuota(ctx, update.ResourceTypeID, userPlan.ID, WithTX(tx))
+		if err != nil {
 			return err
 		}
 
@@ -617,15 +692,14 @@ func (d *Database) ProcessUpdateForQuota(ctx context.Context, update *Update, op
 			return fmt.Errorf("invalid update type: %s", update.UpdateOperationName)
 		}
 
-		upsertE := tx.Insert("quotas").Rows(
-			goqu.Record{},
-		).
-			OnConflict(goqu.DoUpdate("resource_type_id", goqu.C("quota").Set(quotaValue))).
-			OnConflict(goqu.DoUpdate("user_plan_id", goqu.C("quota").Set(quotaValue))).
-			Executor()
-
-		_, err = upsertE.ExecContext(ctx)
-		if err != nil {
+		if err = d.UpsertQuota(
+			ctx,
+			quotaFound,
+			quotaValue,
+			update.ResourceTypeID,
+			userPlan.ID,
+			WithTX(tx),
+		); err != nil {
 			return err
 		}
 
