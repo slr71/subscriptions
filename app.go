@@ -131,7 +131,7 @@ func (a *App) GetUserUpdatesHandler(subject, reply string, request *qms.UpdateLi
 
 	d := db.New(a.db)
 
-	mUpdates, err := db.UserUpdates(ctx, d, username)
+	mUpdates, err := d.UserUpdates(ctx, username)
 	if err != nil {
 		log.Error(err)
 		response.Error = gotelnats.InitServiceError(
@@ -148,17 +148,17 @@ func (a *App) GetUserUpdatesHandler(subject, reply string, request *qms.UpdateLi
 			ValueType:     mu.ValueType,
 			Value:         mu.Value,
 			ResourceType: &qms.ResourceType{
-				Uuid: mu.ResourceType.ID,
-				Name: mu.ResourceType.Name,
-				Unit: mu.ResourceType.Unit,
+				Uuid: mu.ResourceTypeID,
+				Name: mu.ResourceTypeName,
+				Unit: mu.ResourceTypeUnit,
 			},
 			Operation: &qms.UpdateOperation{
-				Uuid: mu.UpdateOperation.ID,
-				Name: mu.UpdateOperation.Name,
+				Uuid: mu.UpdateOperationID,
+				Name: mu.UpdateOperationName,
 			},
 			User: &qms.QMSUser{
-				Uuid:     mu.User.ID,
-				Username: mu.User.Username,
+				Uuid:     mu.UserID,
+				Username: mu.Username,
 			},
 		})
 	}
@@ -203,7 +203,7 @@ func (a *App) AddUserUpdateHandler(subject, reply string, request *qms.AddUpdate
 	// Get the userID if it's not provided
 	if request.Update.User.Uuid == "" {
 		log.Infof("getting user ID for %s", username)
-		userID, err = db.GetUserID(ctx, d, username)
+		userID, err = d.GetUserID(ctx, username)
 		if err != nil {
 			sendError(ctx, response, err)
 			return
@@ -217,9 +217,8 @@ func (a *App) AddUserUpdateHandler(subject, reply string, request *qms.AddUpdate
 	// Get the resource type id if it's not provided.
 	if request.Update.ResourceType.Uuid == "" {
 		log.Infof("getting resource type id for resource '%s'", request.Update.ResourceType.Name)
-		resourceTypeID, err = db.GetResourceTypeID(
+		resourceTypeID, err = d.GetResourceTypeID(
 			ctx,
-			d,
 			request.Update.ResourceType.Name,
 			request.Update.ResourceType.Unit,
 		)
@@ -236,9 +235,8 @@ func (a *App) AddUserUpdateHandler(subject, reply string, request *qms.AddUpdate
 	// Get the operation id if it's not provided.
 	if request.Update.Operation.Uuid == "" {
 		log.Infof("getting operation ID for %s", request.Update.Operation.Name)
-		operationID, err = db.GetOperationID(
+		operationID, err = d.GetOperationID(
 			ctx,
-			d,
 			request.Update.Operation.Name,
 		)
 		if err != nil {
@@ -254,27 +252,21 @@ func (a *App) AddUserUpdateHandler(subject, reply string, request *qms.AddUpdate
 	// construct the model.Update
 	if response.Error == nil {
 		mUpdate := &db.Update{
-			ValueType:     request.Update.ValueType,
-			Value:         request.Update.Value,
-			EffectiveDate: request.Update.EffectiveDate.AsTime(),
-			ResourceType: db.ResourceType{
-				ID:   resourceTypeID,
-				Name: request.Update.ResourceType.Name,
-				Unit: request.Update.ResourceType.Unit,
-			},
-			UpdateOperation: db.UpdateOperation{
-				ID:   operationID,
-				Name: request.Update.Operation.Name,
-			},
-			User: db.User{
-				ID:       userID,
-				Username: username,
-			},
+			ValueType:           request.Update.ValueType,
+			Value:               request.Update.Value,
+			EffectiveDate:       request.Update.EffectiveDate.AsTime(),
+			ResourceTypeID:      resourceTypeID,
+			ResourceTypeName:    request.Update.ResourceType.Name,
+			ResourceTypeUnit:    request.Update.ResourceType.Unit,
+			UserID:              userID,
+			Username:            request.Update.User.Username,
+			UpdateOperationID:   operationID,
+			UpdateOperationName: request.Update.Operation.Name,
 		}
 
 		log.Info("adding update to the database")
 		// Add the update to the database.
-		update, err = db.AddUserUpdate(ctx, d, mUpdate)
+		update, err = d.AddUserUpdate(ctx, mUpdate)
 		if err != nil {
 			sendError(ctx, response, err)
 			return
@@ -286,7 +278,7 @@ func (a *App) AddUserUpdateHandler(subject, reply string, request *qms.AddUpdate
 		switch update.ValueType {
 		case db.UsagesTrackedMetric:
 			log.Info("processing update for usage")
-			if err = db.ProcessUpdateForUsage(ctx, d, update); err != nil {
+			if err = d.ProcessUpdateForUsage(ctx, update); err != nil {
 				sendError(ctx, response, err)
 				return
 			}
@@ -294,7 +286,7 @@ func (a *App) AddUserUpdateHandler(subject, reply string, request *qms.AddUpdate
 
 		case db.QuotasTrackedMetric:
 			log.Info("processing update for quota")
-			if err = db.ProcessUpdateForQuota(ctx, d, update); err != nil {
+			if err = d.ProcessUpdateForQuota(ctx, update); err != nil {
 				sendError(ctx, response, err)
 				return
 			}
@@ -312,17 +304,17 @@ func (a *App) AddUserUpdateHandler(subject, reply string, request *qms.AddUpdate
 			ValueType: update.ValueType,
 			Value:     update.Value,
 			ResourceType: &qms.ResourceType{
-				Uuid: update.ResourceType.ID,
-				Name: update.ResourceType.Name,
-				Unit: update.ResourceType.Unit,
+				Uuid: update.ResourceTypeID,
+				Name: update.ResourceTypeName,
+				Unit: update.ResourceTypeUnit,
 			},
 			EffectiveDate: timestamppb.New(update.EffectiveDate),
 			Operation: &qms.UpdateOperation{
-				Uuid: update.UpdateOperation.ID,
+				Uuid: update.UpdateOperationID,
 			},
 			User: &qms.QMSUser{
-				Uuid:     update.User.ID,
-				Username: update.User.Username,
+				Uuid:     update.UserID,
+				Username: update.Username,
 			},
 		}
 

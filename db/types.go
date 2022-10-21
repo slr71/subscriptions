@@ -70,13 +70,21 @@ const (
 )
 
 type Update struct {
-	ID              string          `db:"id" goqu:"defaultifempty"`
-	ValueType       string          `db:"value_type"`
-	Value           float64         `db:"value"`
-	EffectiveDate   time.Time       `db:"effective_date"`
-	UpdateOperation UpdateOperation `db:"update_operations"`
-	ResourceType    ResourceType    `db:"resource_type"`
-	User            User            `db:"users"`
+	ID                  string    `db:"id" goqu:"defaultifempty"`
+	ValueType           string    `db:"value_type"`
+	Value               float64   `db:"value"`
+	EffectiveDate       time.Time `db:"effective_date"`
+	CreatedBy           string    `db:"created_by"`
+	CreatedAt           time.Time `db:"created_at" goqu:"defaultifempty"`
+	LastModifiedBy      string    `db:"last_modified_by"`
+	LastModifiedAt      time.Time `db:"last_modified_at" goqu:"defaultifempty"`
+	ResourceTypeID      string    `db:"resource_type_id"`
+	ResourceTypeName    string    `db:"resource_type_name"`
+	ResourceTypeUnit    string    `db:"resource_type_unit"`
+	UserID              string    `db:"user_id"`
+	Username            string    `db:"username"`
+	UpdateOperationID   string    `db:"update_operation_id"`
+	UpdateOperationName string    `db:"update_operation_name"`
 }
 
 type UserPlan struct {
