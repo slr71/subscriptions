@@ -478,9 +478,58 @@ func (d *Database) GetCurrentUsage(ctx context.Context, resourceTypeID, userPlan
 	return usageValue, usageFound, nil
 }
 
+func (d *Database) UpsertUsage(ctx context.Context, update bool, value float64, resourceTypeID, userPlanID string, opts ...QueryOption) error {
+	var (
+		err error
+		db  GoquDatabase
+	)
+
+	querySettings := &QuerySettings{}
+	for _, opt := range opts {
+		opt(querySettings)
+	}
+
+	if querySettings.tx != nil {
+		db = querySettings.tx
+	} else {
+		db = d.goquDB
+	}
+
+	updateRecord := goqu.Record{
+		"usage":            value,
+		"resource_type_id": resourceTypeID,
+		"user_plan_id":     userPlanID,
+		"last_modified_by": "de",
+		"created_by":       "de",
+	}
+
+	var upsertE exec.QueryExecutor
+	if !update {
+		upsertE = db.Insert("usages").Rows(updateRecord).Executor()
+	} else {
+		upsertE = db.Update("usages").Set(updateRecord).Where(
+			goqu.And(
+				goqu.I("resource_type_id").Eq(resourceTypeID),
+				goqu.I("user_plan_id").Eq(userPlanID),
+			),
+		).Executor()
+	}
+
+	log.Info(upsertE.ToSQL())
+
+	_, err = upsertE.ExecContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (d *Database) ProcessUpdateForUsage(ctx context.Context, update *Update) error {
 	log = log.WithFields(logrus.Fields{"context": "usage update", "user": update.Username})
+
 	db := d.fullDB
+
 	log.Debug("beginning transaction")
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
@@ -514,30 +563,7 @@ func (d *Database) ProcessUpdateForUsage(ctx context.Context, update *Update) er
 		log.Debugf("new usage value is %f", usageValue)
 
 		log.Debug("upserting new usage value")
-		updateRecord := goqu.Record{
-			"usage":            usageValue,
-			"resource_type_id": update.ResourceTypeID,
-			"user_plan_id":     userPlan.ID,
-			"last_modified_by": "de",
-			"created_by":       "de",
-		}
-
-		var upsertE exec.QueryExecutor
-		if !usageFound {
-			upsertE = tx.Insert("usages").Rows(updateRecord).Executor()
-		} else {
-			upsertE = tx.Update("usages").Set(updateRecord).Where(
-				goqu.And(
-					goqu.I("resource_type_id").Eq(update.ResourceTypeID),
-					goqu.I("user_plan_id").Eq(userPlan.ID),
-				),
-			).Executor()
-		}
-
-		log.Info(upsertE.ToSQL())
-
-		_, err = upsertE.ExecContext(ctx)
-		if err != nil {
+		if err = d.UpsertUsage(ctx, usageFound, usageValue, update.ResourceTypeID, userPlan.ID, WithTX(tx)); err != nil {
 			return err
 		}
 		log.Debug("done upserting new value")
