@@ -108,14 +108,14 @@ spec:
               containerPort: 9000
           livenessProbe:
             httpGet:
-              path: /
-              port: 9000
+              path: /debug/vars
+              port: 60000
             initialDelaySeconds: 5
             periodSeconds: 5
           readinessProbe:
             httpGet:
-              path: /
-              port: 9000
+              path: /debug/vars
+              port: 60000
             initialDelaySeconds: 5
             periodSeconds: 5
 ---
