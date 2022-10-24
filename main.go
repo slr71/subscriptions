@@ -50,7 +50,7 @@ func main() {
 		reconnectWait  = flag.Int("reconnect-wait", gotelnats.DefaultReconnectWait, "Seconds to wait between reconnection attempts to NATS")
 		natsSubject    = flag.String("subject", "cyverse.qms.>", "NATS subject to subscribe to")
 		natsQueue      = flag.String("queue", "cyverse.qms", "Name of the NATS queue to use")
-		envPrefix      = flag.String("env-prefix", "SBS_", "The prefix for environment variables")
+		envPrefix      = flag.String("env-prefix", "QMS_", "The prefix for environment variables")
 		reportOverages = flag.Bool("report-overages", true, "Allows the overages feature to effectively be shut down")
 		logLevel       = flag.String("log-level", "debug", "One of trace, debug, info, warn, error, fatal, or panic.")
 		listenPort     = flag.Int("port", 60000, "The port the service listens on for requests")
