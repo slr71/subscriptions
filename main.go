@@ -82,12 +82,12 @@ func main() {
 
 	dbURI := config.String("database.uri")
 	if dbURI == "" {
-		log.Fatal("db.uri must be set in the configuration file")
+		log.Fatal("database.uri must be set in the configuration file")
 	}
 
 	// Make sure the db.uri URL is parseable
 	if _, err = url.Parse(dbURI); err != nil {
-		log.Fatal(errors.Wrap(err, "Can't parse db.uri in the config file"))
+		log.Fatal(errors.Wrap(err, "Can't parse database.uri in the config file"))
 	}
 
 	userSuffix := config.String("username.suffix")
