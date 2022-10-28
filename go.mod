@@ -9,6 +9,7 @@ require (
 	github.com/cyverse-de/go-mod/otelutils v0.0.3
 	github.com/cyverse-de/go-mod/pbinit v0.0.7
 	github.com/cyverse-de/go-mod/protobufjson v0.0.3
+	github.com/cyverse-de/go-mod/subjects v0.0.2
 	github.com/cyverse-de/p/go/qms v0.0.8
 	github.com/cyverse-de/p/go/svcerror v0.0.5
 	github.com/doug-martin/goqu/v9 v9.18.0
@@ -26,7 +27,6 @@ require (
 )
 
 require (
-	github.com/cyverse-de/go-mod/subjects v0.0.2 // indirect
 	github.com/cyverse-de/p/go/header v0.0.1 // indirect
 	github.com/cyverse-de/p/go/monitoring v0.0.2 // indirect
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
