@@ -85,27 +85,28 @@ func (d *Database) UserUpdates(ctx context.Context, username string, opts ...Que
 	query := db.From(updatesT).
 		Select(
 			updatesT.Col("id"),
-			updatesT.Col("user_id"),
 			updatesT.Col("value_type"),
 			updatesT.Col("value"),
-			updatesT.Col("update_operation_id"),
 			updatesT.Col("effective_date"),
 			updatesT.Col("created_by"),
 			updatesT.Col("created_at"),
 			updatesT.Col("last_modified_by"),
 			updatesT.Col("last_modified_at"),
-			rtT.Col("id").As("resource_type_id"),
-			rtT.Col("name").As("resource_type_name"),
-			rtT.Col("unit").As("resource_type_unit"),
-			usersT.Col("username"),
-			opsT.Col("name").As("update_operation_name"),
+
+			usersT.Col("id").As(goqu.C("users.id")),
+			usersT.Col("username").As(goqu.C("users.username")),
+
+			rtT.Col("id").As(goqu.C("resource_types.id")),
+			rtT.Col("name").As(goqu.C("resource_types.name")),
+			rtT.Col("unit").As(goqu.C("resource_types.unit")),
+
+			opsT.Col("id").As(goqu.C("update_operations.id")),
+			opsT.Col("name").As(goqu.C("update_operations.name")),
 		).
 		Join(usersT, goqu.On(goqu.I("updates.user_id").Eq(goqu.I("users.id")))).
 		Join(opsT, goqu.On(goqu.I("updates.update_operation_id").Eq(goqu.I("update_operations.id")))).
 		Join(rtT, goqu.On(goqu.I("updates.resource_type_id").Eq(goqu.I("resource_types.id")))).
-		Where(goqu.Ex{
-			"users.username": username,
-		})
+		Where(usersT.Col("username").Eq(username))
 
 	if querySettings.hasLimit {
 		query = query.Limit(querySettings.limit)
@@ -424,9 +425,9 @@ func (d *Database) AddUserUpdate(ctx context.Context, update *Update, opts ...Qu
 			"value_type":          update.ValueType,
 			"value":               update.Value,
 			"effective_date":      update.EffectiveDate,
-			"update_operation_id": update.UpdateOperationID,
-			"resource_type_id":    update.ResourceTypeID,
-			"user_id":             update.UserID,
+			"update_operation_id": update.UpdateOperation.ID,
+			"resource_type_id":    update.ResourceType.ID,
+			"user_id":             update.User.ID,
 		},
 	).
 		Returning(goqu.C("id")).
@@ -612,7 +613,7 @@ func (d *Database) UpsertQuota(ctx context.Context, update bool, value float64, 
 }
 
 func (d *Database) ProcessUpdateForUsage(ctx context.Context, update *Update) error {
-	log = log.WithFields(logrus.Fields{"context": "usage update", "user": update.Username})
+	log = log.WithFields(logrus.Fields{"context": "usage update", "user": update.User.Username})
 
 	db := d.fullDB
 
@@ -625,31 +626,32 @@ func (d *Database) ProcessUpdateForUsage(ctx context.Context, update *Update) er
 
 	if err = tx.Wrap(func() error {
 		log.Debug("before getting active user plan")
-		userPlan, err := d.GetActiveUserPlan(ctx, update.Username, WithTX(tx))
+		userPlan, err := d.GetActiveUserPlan(ctx, update.User.Username, WithTX(tx))
 		if err != nil {
 			return err
 		}
 		log.Debugf("after getting active user plan %s", userPlan.ID)
 
 		log.Debug("getting current usage")
-		usageValue, usageFound, err := d.GetCurrentUsage(ctx, update.ResourceTypeID, userPlan.ID, WithTX(tx))
+		usageValue, usageFound, err := d.GetCurrentUsage(ctx, update.ResourceType.ID, userPlan.ID, WithTX(tx))
 		if err != nil {
 			return err
 		}
 		log.Debugf("done getting current usage of %f", usageValue)
 
-		switch update.UpdateOperationName {
+		log.Debugf("update operation name is %s", update.UpdateOperation.Name)
+		switch update.UpdateOperation.Name {
 		case UpdateTypeSet:
 			usageValue = update.Value
 		case UpdateTypeAdd:
 			usageValue = usageValue + update.Value
 		default:
-			return fmt.Errorf("invalid update type: %s", update.UpdateOperationName)
+			return fmt.Errorf("invalid update type: %s", update.UpdateOperation.Name)
 		}
 		log.Debugf("new usage value is %f", usageValue)
 
 		log.Debug("upserting new usage value")
-		if err = d.UpsertUsage(ctx, usageFound, usageValue, update.ResourceTypeID, userPlan.ID, WithTX(tx)); err != nil {
+		if err = d.UpsertUsage(ctx, usageFound, usageValue, update.ResourceType.ID, userPlan.ID, WithTX(tx)); err != nil {
 			return err
 		}
 		log.Debug("done upserting new value")
@@ -673,30 +675,30 @@ func (d *Database) ProcessUpdateForQuota(ctx context.Context, update *Update, op
 	}
 
 	if err = tx.Wrap(func() error {
-		userPlan, err := d.GetActiveUserPlan(ctx, update.Username, WithTX(tx))
+		userPlan, err := d.GetActiveUserPlan(ctx, update.User.Username, WithTX(tx))
 		if err != nil {
 			return err
 		}
 
-		quotaValue, quotaFound, err := d.GetCurrentQuota(ctx, update.ResourceTypeID, userPlan.ID, WithTX(tx))
+		quotaValue, quotaFound, err := d.GetCurrentQuota(ctx, update.ResourceType.ID, userPlan.ID, WithTX(tx))
 		if err != nil {
 			return err
 		}
 
-		switch update.UpdateOperationName {
+		switch update.UpdateOperation.Name {
 		case UpdateTypeSet:
 			quotaValue = update.Value
 		case UpdateTypeAdd:
 			quotaValue = quotaValue + update.Value
 		default:
-			return fmt.Errorf("invalid update type: %s", update.UpdateOperationName)
+			return fmt.Errorf("invalid update type: %s", update.UpdateOperation.Name)
 		}
 
 		if err = d.UpsertQuota(
 			ctx,
 			quotaFound,
 			quotaValue,
-			update.ResourceTypeID,
+			update.ResourceType.ID,
 			userPlan.ID,
 			WithTX(tx),
 		); err != nil {

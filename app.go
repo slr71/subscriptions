@@ -119,17 +119,17 @@ func (a *App) GetUserUpdatesHandler(subject, reply string, request *qms.UpdateLi
 			ValueType:     mu.ValueType,
 			Value:         mu.Value,
 			ResourceType: &qms.ResourceType{
-				Uuid: mu.ResourceTypeID,
-				Name: mu.ResourceTypeName,
-				Unit: mu.ResourceTypeUnit,
+				Uuid: mu.ResourceType.ID,
+				Name: mu.ResourceType.Name,
+				Unit: mu.ResourceType.Unit,
 			},
 			Operation: &qms.UpdateOperation{
-				Uuid: mu.UpdateOperationID,
-				Name: mu.UpdateOperationName,
+				Uuid: mu.UpdateOperation.ID,
+				Name: mu.UpdateOperation.Name,
 			},
 			User: &qms.QMSUser{
-				Uuid:     mu.UserID,
-				Username: mu.Username,
+				Uuid:     mu.User.ID,
+				Username: mu.User.Username,
 			},
 		})
 	}
@@ -222,29 +222,32 @@ func (a *App) AddUserUpdateHandler(subject, reply string, request *qms.AddUpdate
 
 	// construct the model.Update
 	if response.Error == nil {
-		mUpdate := &db.Update{
-			ValueType:           request.Update.ValueType,
-			Value:               request.Update.Value,
-			EffectiveDate:       request.Update.EffectiveDate.AsTime(),
-			ResourceTypeID:      resourceTypeID,
-			ResourceTypeName:    request.Update.ResourceType.Name,
-			ResourceTypeUnit:    request.Update.ResourceType.Unit,
-			UserID:              userID,
-			Username:            username,
-			UpdateOperationID:   operationID,
-			UpdateOperationName: request.Update.Operation.Name,
+		update = &db.Update{
+			ValueType:     request.Update.ValueType,
+			Value:         request.Update.Value,
+			EffectiveDate: request.Update.EffectiveDate.AsTime(),
+			ResourceType: db.ResourceType{
+				ID:   resourceTypeID,
+				Name: request.Update.ResourceType.Name,
+				Unit: request.Update.ResourceType.Unit,
+			},
+			User: db.User{
+				ID:       userID,
+				Username: username,
+			},
+			UpdateOperation: db.UpdateOperation{
+				ID:   operationID,
+				Name: request.Update.Operation.Name,
+			},
 		}
 
 		log.Info("adding update to the database")
-		// Add the update to the database.
-		update, err = d.AddUserUpdate(ctx, mUpdate)
+		_, err = d.AddUserUpdate(ctx, update)
 		if err != nil {
 			sendError(ctx, response, err)
 			return
 		}
 		log.Info("done adding update to the database")
-
-		log.Infof("value type %s", update.ValueType)
 
 		switch update.ValueType {
 		case db.UsagesTrackedMetric:
@@ -270,26 +273,25 @@ func (a *App) AddUserUpdateHandler(subject, reply string, request *qms.AddUpdate
 		}
 
 		// Set up the object for the response.
-		rUpdate := qms.Update{
+		response.Update = &qms.Update{
 			Uuid:      update.ID,
 			ValueType: update.ValueType,
 			Value:     update.Value,
 			ResourceType: &qms.ResourceType{
-				Uuid: update.ResourceTypeID,
-				Name: update.ResourceTypeName,
-				Unit: update.ResourceTypeUnit,
+				Uuid: update.ResourceType.ID,
+				Name: update.ResourceType.Name,
+				Unit: update.ResourceType.Unit,
 			},
 			EffectiveDate: timestamppb.New(update.EffectiveDate),
 			Operation: &qms.UpdateOperation{
-				Uuid: update.UpdateOperationID,
+				Uuid: update.UpdateOperation.ID,
+				Name: update.UpdateOperation.Name,
 			},
 			User: &qms.QMSUser{
-				Uuid:     update.UserID,
-				Username: update.Username,
+				Uuid:     update.User.ID,
+				Username: update.User.Username,
 			},
 		}
-
-		response.Update = &rUpdate
 	}
 
 	// Send the response to the caller
