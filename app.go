@@ -5,67 +5,28 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cyverse-de/go-mod/gotelnats"
 	"github.com/cyverse-de/go-mod/pbinit"
 	"github.com/cyverse-de/p/go/qms"
 	"github.com/cyverse-de/subscriptions/db"
+	"github.com/cyverse-de/subscriptions/natscl"
 	"github.com/jmoiron/sqlx"
-	"github.com/nats-io/nats.go"
 	"github.com/samber/lo"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type App struct {
-	natsConn      *nats.EncodedConn
-	db            *sqlx.DB
-	baseSubject   string
-	baseQueue     string
-	subscriptions []*nats.Subscription
-	userSuffix    string
+	client     *natscl.Client
+	db         *sqlx.DB
+	userSuffix string
 }
 
-func New(natsConn *nats.EncodedConn, db *sqlx.DB, baseQueue, baseSubject, userSuffix string) *App {
+func New(client *natscl.Client, db *sqlx.DB, userSuffix string) *App {
 	return &App{
-		natsConn:    natsConn,
-		db:          db,
-		baseSubject: baseSubject,
-		baseQueue:   baseQueue,
-		userSuffix:  userSuffix,
+		client:     client,
+		db:         db,
+		userSuffix: userSuffix,
 	}
-}
-
-func (a *App) natsSubject(fields ...string) string {
-	trimmed := strings.TrimSuffix(
-		strings.TrimSuffix(a.baseSubject, ".*"),
-		".>",
-	)
-	addFields := strings.Join(fields, ".")
-	return fmt.Sprintf("%s.%s", trimmed, addFields)
-}
-
-func (a *App) natsQueue(fields ...string) string {
-	return fmt.Sprintf("%s.%s", a.baseQueue, strings.Join(fields, "."))
-}
-
-func (a *App) queueSub(name string, handler nats.Handler) {
-	var err error
-
-	subject := a.natsSubject(name)
-	queue := a.natsQueue(name)
-
-	s, err := a.natsConn.QueueSubscribe(subject, queue, handler)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	a.subscriptions = append(a.subscriptions, s)
-}
-
-func (a *App) Init() *App {
-	a.queueSub("user.updates.get", a.GetUserUpdatesHandler)
-	a.queueSub("user.updates.add", a.AddUserUpdateHandler)
-	return a
 }
 
 func (a *App) FixUsername(username string) (string, error) {
@@ -129,7 +90,7 @@ func (a *App) GetUserUpdatesHandler(subject, reply string, request *qms.UpdateLi
 	sendError := func(ctx context.Context, response *qms.UpdateListResponse, err error) {
 		log.Error(err)
 		response.Error = natsError(ctx, err)
-		if err = gotelnats.PublishResponse(ctx, a.natsConn, reply, response); err != nil {
+		if err = a.client.Respond(ctx, reply, response); err != nil {
 			log.Error(err)
 		}
 	}
@@ -173,7 +134,7 @@ func (a *App) GetUserUpdatesHandler(subject, reply string, request *qms.UpdateLi
 		})
 	}
 
-	if err = gotelnats.PublishResponse(ctx, a.natsConn, reply, response); err != nil {
+	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
 }
@@ -195,7 +156,7 @@ func (a *App) AddUserUpdateHandler(subject, reply string, request *qms.AddUpdate
 	sendError := func(ctx context.Context, response *qms.AddUpdateResponse, err error) {
 		log.Error(err)
 		response.Error = natsError(ctx, err)
-		if err = gotelnats.PublishResponse(ctx, a.natsConn, reply, response); err != nil {
+		if err = a.client.Respond(ctx, reply, response); err != nil {
 			log.Error(err)
 		}
 	}
@@ -332,8 +293,7 @@ func (a *App) AddUserUpdateHandler(subject, reply string, request *qms.AddUpdate
 	}
 
 	// Send the response to the caller
-	if err = gotelnats.PublishResponse(ctx, a.natsConn, reply, response); err != nil {
+	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
-
 }

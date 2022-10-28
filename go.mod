@@ -26,6 +26,7 @@ require (
 )
 
 require (
+	github.com/cyverse-de/go-mod/subjects v0.0.2 // indirect
 	github.com/cyverse-de/p/go/header v0.0.1 // indirect
 	github.com/cyverse-de/p/go/monitoring v0.0.2 // indirect
 	github.com/fsnotify/fsnotify v1.4.9 // indirect

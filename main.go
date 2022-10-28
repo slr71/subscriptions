@@ -15,6 +15,8 @@ import (
 	"github.com/cyverse-de/go-mod/logging"
 	"github.com/cyverse-de/go-mod/otelutils"
 	"github.com/cyverse-de/go-mod/protobufjson"
+	"github.com/cyverse-de/go-mod/subjects"
+	"github.com/cyverse-de/subscriptions/natscl"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/koanf"
 	"github.com/nats-io/nats.go"
@@ -106,53 +108,39 @@ func main() {
 	dbconn.SetMaxOpenConns(10)
 	dbconn.SetConnMaxIdleTime(time.Minute)
 
-	nc, err := nats.Connect(
-		natsCluster,
-		nats.UserCredentials(*credsPath),
-		nats.RootCAs(*caCert),
-		nats.ClientCert(*tlsCert, *tlsKey),
-		nats.RetryOnFailedConnect(true),
-		nats.MaxReconnects(*maxReconnects),
-		nats.ReconnectWait(time.Duration(*reconnectWait)*time.Second),
-		nats.DisconnectErrHandler(func(nc *nats.Conn, err error) {
-			if err != nil {
-				log.Errorf("disconnected from nats: %s", err.Error())
-			}
-		}),
-		nats.ReconnectHandler(func(nc *nats.Conn) {
-			log.Infof("reconnected to %s", nc.ConnectedUrl())
-		}),
-		nats.ClosedHandler(func(nc *nats.Conn) {
-			log.Errorf("connection closed: %s", nc.LastError().Error())
-		}),
-	)
+	natsSettings := natscl.ConnectionSettings{
+		ClusterURLS:   natsCluster,
+		CredsPath:     *credsPath,
+		TLSCACertPath: *caCert,
+		TLSCertPath:   *tlsCert,
+		TLSKeyPath:    *tlsKey,
+		MaxReconnects: *maxReconnects,
+		ReconnectWait: *reconnectWait,
+	}
+
+	natsConn, err := natscl.NewConnection(&natsSettings)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.Infof("configured servers: %s", strings.Join(nc.Servers(), " "))
-	log.Infof("connected to NATS host: %s", nc.ConnectedServerName())
-
-	log.Infof("NATS URLs are %s", natsCluster)
-	log.Infof("NATS TLS cert file is %s", *tlsCert)
-	log.Infof("NATS TLS key file is %s", *tlsKey)
-	log.Infof("NATS CA cert file is %s", *caCert)
-	log.Infof("NATS creds file is %s", *credsPath)
+	log.Infof("configured servers: %s", strings.Join(natsConn.Conn.Servers(), " "))
+	log.Infof("connected to NATS host: %s", natsConn.Conn.ConnectedServerName())
+	log.Infof("NATS URLs are %s", natsSettings.ClusterURLS)
+	log.Infof("NATS TLS cert file is %s", natsSettings.TLSCertPath)
+	log.Infof("NATS TLS key file is %s", natsSettings.TLSKeyPath)
+	log.Infof("NATS CA cert file is %s", natsSettings.TLSCACertPath)
+	log.Infof("NATS creds file is %s", natsSettings.CredsPath)
 	log.Infof("NATS subject is %s", *natsSubject)
 	log.Infof("NATS queue is %s", *natsQueue)
 	log.Infof("--report-overages is %t", *reportOverages)
 
-	natsConn, err := nats.NewEncodedConn(nc, "protojson")
-	if err != nil {
-		log.Fatal(err)
-	}
+	natsClient := natscl.NewClient(natsConn, userSuffix, serviceName)
 
-	app := New(natsConn, dbconn, *natsQueue, *natsSubject, userSuffix).Init()
-	for _, sub := range app.subscriptions {
-		log.Infof("added handler for subject %s on queue %s", sub.Subject, sub.Queue)
-	}
+	app := New(natsClient, dbconn, userSuffix)
+
+	natsClient.Subscribe(subjects.QMSGetUserUpdates, app.GetUserUpdatesHandler)
+	natsClient.Subscribe(subjects.QMSAddUserUpdate, app.AddUserUpdateHandler)
 
 	srv := fmt.Sprintf(":%s", strconv.Itoa(*listenPort))
-	// Listen for requests on /debug/vars and prevent the app from exiting.
 	log.Fatal(http.ListenAndServe(srv, nil))
 }
