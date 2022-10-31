@@ -140,6 +140,8 @@ func main() {
 
 	natsClient.Subscribe(subjects.QMSGetUserUpdates, app.GetUserUpdatesHandler)
 	natsClient.Subscribe(subjects.QMSAddUserUpdate, app.AddUserUpdateHandler)
+	natsClient.Subscribe(subjects.QMSGetUserUsages, app.GetUsagesHandler)
+	natsClient.Subscribe(subjects.QMSAddUserUsages, app.AddUsageHandler)
 
 	srv := fmt.Sprintf(":%s", strconv.Itoa(*listenPort))
 	log.Fatal(http.ListenAndServe(srv, nil))

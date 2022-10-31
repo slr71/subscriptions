@@ -87,9 +87,8 @@ type UserPlan struct {
 	ID                 string    `db:"id" goqu:"defaultifempty"`
 	EffectiveStartDate time.Time `db:"effective_start_date"`
 	EffectiveEndDate   time.Time `db:"effective_end_date"`
-	UserID             string    `db:"user_id"`
 	User               User      `db:"users"`
-	PlanID             string    `db:"plan_id"`
+	Plan               Plan      `db:"plans"`
 	CreatedBy          string    `db:"created_by"`
 	CreatedAt          time.Time `db:"created_at" goqu:"defaultifempty"`
 	LastModifiedBy     string    `db:"last_modified_by"`
@@ -104,7 +103,7 @@ type Plan struct {
 
 type PlanQuotaDefault struct {
 	ID           string       `db:"id" goqu:"defaultifempty"`
-	Plan         Plan         `db:"plans"`
+	PlanID       string       `db:"plan_id"`
 	QuotaValue   float64      `db:"quota_value"`
 	ResourceType ResourceType `db:"resource_types"`
 }
@@ -117,12 +116,12 @@ type Usage struct {
 }
 
 type Quota struct {
-	ID             string    `db:"id" goqu:"defaultifempty"`
-	Quota          float64   `db:"quota"`
-	ResourceTypeID string    `db:"resource_type_id"`
-	UserPlanID     string    `db:"user_plan_id"`
-	CreatedBy      string    `db:"created_by"`
-	CreatedAt      time.Time `db:"created_at"`
-	LastModifiedBy string    `db:"last_modified_by"`
-	LastModifiedAt time.Time `db:"last_modified_at"`
+	ID             string       `db:"id" goqu:"defaultifempty"`
+	Quota          float64      `db:"quota"`
+	ResourceType   ResourceType `db:"resource_type_id"`
+	UserPlan       UserPlan     `db:"user_plan_id"`
+	CreatedBy      string       `db:"created_by"`
+	CreatedAt      time.Time    `db:"created_at"`
+	LastModifiedBy string       `db:"last_modified_by"`
+	LastModifiedAt time.Time    `db:"last_modified_at"`
 }
