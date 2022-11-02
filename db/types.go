@@ -119,9 +119,18 @@ type Quota struct {
 	ID             string       `db:"id" goqu:"defaultifempty"`
 	Quota          float64      `db:"quota"`
 	ResourceType   ResourceType `db:"resource_type_id"`
-	UserPlan       UserPlan     `db:"user_plan_id"`
+	UserPlan       UserPlan     `db:"user_plans"`
 	CreatedBy      string       `db:"created_by"`
 	CreatedAt      time.Time    `db:"created_at"`
 	LastModifiedBy string       `db:"last_modified_by"`
 	LastModifiedAt time.Time    `db:"last_modified_at"`
+}
+
+type Overage struct {
+	UserPlanID   string       `db:"user_plan_id"`
+	User         User         `db:"users"`
+	Plan         Plan         `db:"plans"`
+	ResourceType ResourceType `db:"resource_types"`
+	QuotaValue   float64      `db:"quota_value"`
+	UsageValue   float64      `db:"usage_value"`
 }

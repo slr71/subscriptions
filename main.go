@@ -140,8 +140,14 @@ func main() {
 
 	natsClient.Subscribe(subjects.QMSGetUserUpdates, app.GetUserUpdatesHandler)
 	natsClient.Subscribe(subjects.QMSAddUserUpdate, app.AddUserUpdateHandler)
+
+	// Only call these two endpoints if you need to correct a usage value and
+	// bypass the updates tables.
 	natsClient.Subscribe(subjects.QMSGetUserUsages, app.GetUsagesHandler)
 	natsClient.Subscribe(subjects.QMSAddUserUsages, app.AddUsageHandler)
+
+	natsClient.Subscribe(subjects.QMSGetUserOverages, app.GetUserOverages)
+	//natsClient.Subscribe(subjects.QMSCheckUserOverages, app.CheckUserOverages)
 
 	srv := fmt.Sprintf(":%s", strconv.Itoa(*listenPort))
 	log.Fatal(http.ListenAndServe(srv, nil))

@@ -16,16 +16,18 @@ import (
 )
 
 type App struct {
-	client     *natscl.Client
-	db         *sqlx.DB
-	userSuffix string
+	client         *natscl.Client
+	db             *sqlx.DB
+	userSuffix     string
+	ReportOverages bool
 }
 
 func New(client *natscl.Client, db *sqlx.DB, userSuffix string) *App {
 	return &App{
-		client:     client,
-		db:         db,
-		userSuffix: userSuffix,
+		client:         client,
+		db:             db,
+		userSuffix:     userSuffix,
+		ReportOverages: true,
 	}
 }
 
