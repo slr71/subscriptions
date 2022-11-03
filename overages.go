@@ -81,3 +81,61 @@ func (a *App) GetUserOverages(subject, reply string, request *qms.AllUserOverage
 		log.Error(err)
 	}
 }
+
+func (a *App) CheckUserOverages(subject, reply string, request *qms.IsOverageRequest) {
+	var err error
+
+	log := log.WithFields(logrus.Fields{"context": "check if in overage"})
+
+	sendError := func(ctx context.Context, response *qms.IsOverage, err error) {
+		log.Error(err)
+		response.Error = natsError(ctx, err)
+		if err = a.client.Respond(ctx, reply, response); err != nil {
+			log.Error(err)
+		}
+	}
+
+	response := pbinit.NewIsOverage()
+	ctx, span := pbinit.InitIsOverageRequest(request, subject)
+	defer span.End()
+
+	if !a.ReportOverages {
+		response.IsOverage = false
+
+		if err = a.client.Respond(ctx, reply, response); err != nil {
+			log.Error(err)
+		}
+
+		return
+	}
+
+	username, err := a.FixUsername(request.Username)
+	if err != nil {
+		sendError(ctx, response, err)
+		return
+	}
+
+	log = log.WithFields(logrus.Fields{"user": username})
+
+	d := db.New(a.db)
+
+	overages, err := d.GetUserOverages(ctx, username)
+	if err != nil {
+		sendError(ctx, response, err)
+		return
+	}
+
+	if len(overages) > 0 {
+		for _, overage := range overages {
+			if overage.ResourceType.Name == request.GetResourceName() {
+				response.IsOverage = true
+			}
+		}
+	} else {
+		response.IsOverage = false
+	}
+
+	if err = a.client.Respond(ctx, reply, response); err != nil {
+		log.Error(err)
+	}
+}

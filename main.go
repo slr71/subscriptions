@@ -146,8 +146,9 @@ func main() {
 	natsClient.Subscribe(subjects.QMSGetUserUsages, app.GetUsagesHandler)
 	natsClient.Subscribe(subjects.QMSAddUserUsages, app.AddUsageHandler)
 
+	// These will get used by frontend calls to check for user overages.
 	natsClient.Subscribe(subjects.QMSGetUserOverages, app.GetUserOverages)
-	//natsClient.Subscribe(subjects.QMSCheckUserOverages, app.CheckUserOverages)
+	natsClient.Subscribe(subjects.QMSCheckUserOverages, app.CheckUserOverages)
 
 	srv := fmt.Sprintf(":%s", strconv.Itoa(*listenPort))
 	log.Fatal(http.ListenAndServe(srv, nil))
