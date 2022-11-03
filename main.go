@@ -150,6 +150,8 @@ func main() {
 	natsClient.Subscribe(subjects.QMSGetUserOverages, app.GetUserOverages)
 	natsClient.Subscribe(subjects.QMSCheckUserOverages, app.CheckUserOverages)
 
+	natsClient.Subscribe(subjects.QMSUserSummary, app.GetUserSummary)
+
 	srv := fmt.Sprintf(":%s", strconv.Itoa(*listenPort))
 	log.Fatal(http.ListenAndServe(srv, nil))
 }

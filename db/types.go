@@ -96,9 +96,9 @@ type UserPlan struct {
 }
 
 type Plan struct {
-	ID          *string `gorm:"type:uuid;default:uuid_generate_v1()" json:"id"`
-	Name        string  `gorm:"not null;unique" json:"name"`
-	Description string  `gorm:"not null" json:"description"`
+	ID          string `db:"id" goqu:"defaultifempty"`
+	Name        string `db:"name"`
+	Description string `db:"description"`
 }
 
 type PlanQuotaDefault struct {

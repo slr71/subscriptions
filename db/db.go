@@ -581,7 +581,7 @@ func (d *Database) UserPlanDetails(ctx context.Context, userPlan *UserPlan, opts
 		quotas   []Quota
 	)
 
-	defaults, err = d.UserPlanQuotaDefaults(ctx, *userPlan.Plan.ID, opts...)
+	defaults, err = d.UserPlanQuotaDefaults(ctx, userPlan.Plan.ID, opts...)
 	if err != nil {
 		return nil, nil, nil, err
 	}
