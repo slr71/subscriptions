@@ -1,4 +1,4 @@
-package main
+package errors
 
 import (
 	"context"
@@ -22,7 +22,7 @@ var (
 	ErrInvalidEffectiveDate = errors.New("invalid effective date")
 )
 
-func httpStatusCode(err error) int {
+func HTTPStatusCode(err error) int {
 	switch err {
 	case ErrUserNotFound:
 		return http.StatusNotFound
@@ -49,7 +49,7 @@ func httpStatusCode(err error) int {
 	}
 }
 
-func natsStatusCode(err error) svcerror.ErrorCode {
+func NatsStatusCode(err error) svcerror.ErrorCode {
 	switch err {
 	case ErrUserNotFound:
 		return svcerror.ErrorCode_NOT_FOUND
@@ -76,10 +76,10 @@ func natsStatusCode(err error) svcerror.ErrorCode {
 	}
 }
 
-func natsError(ctx context.Context, err error) *svcerror.ServiceError {
+func NatsError(ctx context.Context, err error) *svcerror.ServiceError {
 	return gotelnats.InitServiceError(
 		ctx, err, &gotelnats.ErrorOptions{
-			ErrorCode: natsStatusCode(err),
+			ErrorCode: NatsStatusCode(err),
 		},
 	)
 }

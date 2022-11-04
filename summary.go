@@ -6,6 +6,7 @@ import (
 	"github.com/cyverse-de/go-mod/pbinit"
 	"github.com/cyverse-de/p/go/qms"
 	"github.com/cyverse-de/subscriptions/db"
+	"github.com/cyverse-de/subscriptions/errors"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -27,7 +28,7 @@ func (a *App) GetUserSummary(subject, reply string, request *qms.RequestByUserna
 
 	sendError := func(ctx context.Context, response *qms.UserPlanResponse, err error) {
 		log.Error(err)
-		response.Error = natsError(ctx, err)
+		response.Error = errors.NatsError(ctx, err)
 		if err = a.client.Respond(ctx, reply, response); err != nil {
 			log.Error(err)
 		}

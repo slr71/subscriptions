@@ -6,6 +6,7 @@ import (
 	"github.com/cyverse-de/go-mod/pbinit"
 	"github.com/cyverse-de/p/go/qms"
 	"github.com/cyverse-de/subscriptions/db"
+	"github.com/cyverse-de/subscriptions/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -19,7 +20,7 @@ func (a *App) GetUsagesHandler(subject, reply string, request *qms.GetUsages) {
 
 	sendError := func(ctx context.Context, response *qms.UsageList, err error) {
 		log.Error(err)
-		response.Error = natsError(ctx, err)
+		response.Error = errors.NatsError(ctx, err)
 		if err = a.client.Respond(ctx, reply, response); err != nil {
 			log.Error(err)
 		}
@@ -83,7 +84,7 @@ func (a *App) AddUsageHandler(subject, reply string, request *qms.AddUsage) {
 
 	sendError := func(ctx context.Context, response *qms.UsageResponse, err error) {
 		log.Error(err)
-		response.Error = natsError(ctx, err)
+		response.Error = errors.NatsError(ctx, err)
 		if err = a.client.Respond(ctx, reply, response); err != nil {
 			log.Error(err)
 		}

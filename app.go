@@ -8,6 +8,7 @@ import (
 	"github.com/cyverse-de/go-mod/pbinit"
 	"github.com/cyverse-de/p/go/qms"
 	"github.com/cyverse-de/subscriptions/db"
+	"github.com/cyverse-de/subscriptions/errors"
 	"github.com/cyverse-de/subscriptions/natscl"
 	"github.com/jmoiron/sqlx"
 	"github.com/samber/lo"
@@ -34,7 +35,7 @@ func New(client *natscl.Client, db *sqlx.DB, userSuffix string) *App {
 func (a *App) FixUsername(username string) (string, error) {
 	u := strings.TrimSuffix(username, a.userSuffix)
 	if u == "" {
-		return "", ErrInvalidUsername
+		return "", errors.ErrInvalidUsername
 	}
 	return u, nil
 }
@@ -49,32 +50,32 @@ func (a *App) validateUpdate(request *qms.AddUpdateRequest) (string, error) {
 		db.ResourceTypeNames,
 		request.Update.ResourceType.Name,
 	) {
-		return username, ErrInvalidResourceName
+		return username, errors.ErrInvalidResourceName
 	}
 
 	if request.Update.ResourceType.Unit == "" || !lo.Contains(
 		db.ResourceTypeUnits,
 		request.Update.ResourceType.Unit,
 	) {
-		return username, ErrInvalidResourceUnit
+		return username, errors.ErrInvalidResourceUnit
 	}
 
 	if request.Update.Operation.Name == "" || !lo.Contains(
 		db.UpdateOperationNames,
 		request.Update.Operation.Name,
 	) {
-		return username, ErrInvalidOperationName
+		return username, errors.ErrInvalidOperationName
 	}
 
 	if request.Update.ValueType == "" || !lo.Contains(
 		[]string{db.UsagesTrackedMetric, db.QuotasTrackedMetric},
 		request.Update.ValueType,
 	) {
-		return username, ErrInvalidValueType
+		return username, errors.ErrInvalidValueType
 	}
 
 	if request.Update.EffectiveDate == nil {
-		return username, ErrInvalidEffectiveDate
+		return username, errors.ErrInvalidEffectiveDate
 	}
 
 	return username, nil
@@ -91,7 +92,7 @@ func (a *App) GetUserUpdatesHandler(subject, reply string, request *qms.UpdateLi
 	// Avoid duplicating a lot of error reporting code.
 	sendError := func(ctx context.Context, response *qms.UpdateListResponse, err error) {
 		log.Error(err)
-		response.Error = natsError(ctx, err)
+		response.Error = errors.NatsError(ctx, err)
 		if err = a.client.Respond(ctx, reply, response); err != nil {
 			log.Error(err)
 		}
@@ -157,7 +158,7 @@ func (a *App) AddUserUpdateHandler(subject, reply string, request *qms.AddUpdate
 	// Avoid duplicating a lot of error reporting code.
 	sendError := func(ctx context.Context, response *qms.AddUpdateResponse, err error) {
 		log.Error(err)
-		response.Error = natsError(ctx, err)
+		response.Error = errors.NatsError(ctx, err)
 		if err = a.client.Respond(ctx, reply, response); err != nil {
 			log.Error(err)
 		}

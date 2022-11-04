@@ -7,6 +7,7 @@ import (
 	"github.com/cyverse-de/go-mod/pbinit"
 	"github.com/cyverse-de/p/go/qms"
 	"github.com/cyverse-de/subscriptions/db"
+	"github.com/cyverse-de/subscriptions/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -35,7 +36,7 @@ func (a *App) GetUserOverages(subject, reply string, request *qms.AllUserOverage
 
 	sendError := func(ctx context.Context, response *qms.OverageList, err error) {
 		log.Error(err)
-		response.Error = natsError(ctx, err)
+		response.Error = errors.NatsError(ctx, err)
 		if err = a.client.Respond(ctx, reply, response); err != nil {
 			log.Error(err)
 		}
@@ -89,7 +90,7 @@ func (a *App) CheckUserOverages(subject, reply string, request *qms.IsOverageReq
 
 	sendError := func(ctx context.Context, response *qms.IsOverage, err error) {
 		log.Error(err)
-		response.Error = natsError(ctx, err)
+		response.Error = errors.NatsError(ctx, err)
 		if err = a.client.Respond(ctx, reply, response); err != nil {
 			log.Error(err)
 		}
