@@ -1,10 +1,11 @@
-package main
+package app
 
 import (
 	"context"
 	"fmt"
 	"strings"
 
+	"github.com/cyverse-de/go-mod/logging"
 	"github.com/cyverse-de/go-mod/pbinit"
 	"github.com/cyverse-de/p/go/qms"
 	"github.com/cyverse-de/subscriptions/db"
@@ -15,6 +16,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+var log = logging.Log.WithFields(logrus.Fields{"package": "apps"})
 
 type App struct {
 	client         *natscl.Client
