@@ -110,16 +110,23 @@ func (a *App) AddUsageHandler(subject, reply string, request *qms.AddUsage) {
 		return
 	}
 
+	resourceID, err := d.GetResourceTypeID(ctx, request.ResourceName, request.ResourceUnit)
+	if err != nil {
+		sendError(ctx, response, err)
+		return
+	}
+
 	usage = db.Usage{
 		Usage:      request.UsageValue,
 		UserPlanID: userPlan.ID,
 		ResourceType: db.ResourceType{
+			ID:   resourceID,
 			Name: request.ResourceName,
 			Unit: request.ResourceUnit,
 		},
 	}
 
-	if err = d.AddUsage(ctx, request.UpdateType, &usage); err != nil {
+	if err = d.CalculateUsage(ctx, request.UpdateType, &usage); err != nil {
 		sendError(ctx, response, err)
 		return
 	}

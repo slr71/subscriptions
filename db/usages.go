@@ -98,11 +98,11 @@ func (d *Database) UpsertUsage(ctx context.Context, update bool, value float64, 
 	return nil
 }
 
-// AddUsage upserts a new usage value, ignore the updates tables. Should only
+// CalculateUsage upserts a new usage value, ignore the updates tables. Should only
 // be used to administratively update a usage value in the case where it gets
 // out of sync with the updates. Accepts a variable number of QueryOptions,
 // though only WithTX is currently supported.
-func (d *Database) AddUsage(ctx context.Context, updateType string, usage *Usage, opts ...QueryOption) error {
+func (d *Database) CalculateUsage(ctx context.Context, updateType string, usage *Usage, opts ...QueryOption) error {
 	var (
 		err           error
 		newUsageValue float64
