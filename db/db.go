@@ -30,6 +30,8 @@ func New(dbconn *sqlx.DB) *Database {
 	}
 }
 
+// QuerySettings provides configuration for queries, such as including a limit
+// statement, an offset statement, or running the query as part of a transaction.
 type QuerySettings struct {
 	hasLimit  bool
 	limit     uint
@@ -38,8 +40,11 @@ type QuerySettings struct {
 	tx        *goqu.TxDatabase
 }
 
+// QueryOption defines the signature for functions that can modify a QuerySettings
+// instance.
 type QueryOption func(*QuerySettings)
 
+// WithQueryLimit allows callers to add a limit SQL statement to a query.
 func WithQueryLimit(limit uint) QueryOption {
 	return func(s *QuerySettings) {
 		s.hasLimit = true
@@ -47,6 +52,7 @@ func WithQueryLimit(limit uint) QueryOption {
 	}
 }
 
+// WithQueryOffset allows callers to add an offset SQL statement to a query.
 func WithQueryOffset(offset uint) QueryOption {
 	return func(s *QuerySettings) {
 		s.hasOffset = true
@@ -54,12 +60,16 @@ func WithQueryOffset(offset uint) QueryOption {
 	}
 }
 
+// WithTX allows callers to use a query as part of a transaction.
 func WithTX(tx *goqu.TxDatabase) QueryOption {
 	return func(s *QuerySettings) {
 		s.tx = tx
 	}
 }
 
+// UserUpdates returns a list of updates associated with a user.
+// Accepts a variable number of QueryOptions, including WithTX, WithQueryLimit,
+// and WithQueryOffset.
 func (d *Database) UserUpdates(ctx context.Context, username string, opts ...QueryOption) ([]Update, error) {
 	var (
 		err error
@@ -143,6 +153,9 @@ func (d *Database) UserUpdates(ctx context.Context, username string, opts ...Que
 	return results, nil
 }
 
+// GetResourceTypeID returns the UUID associated with the name and unit passed in.
+// Accepts a variable number of QueryOptions, though only transactions are
+// currently supported.
 func (d *Database) GetResourceTypeID(ctx context.Context, name, unit string, opts ...QueryOption) (string, error) {
 	var (
 		err error
@@ -178,6 +191,9 @@ func (d *Database) GetResourceTypeID(ctx context.Context, name, unit string, opt
 	return result, nil
 }
 
+// GetResourceType returns a *ResourceType associated with the UUID passed in.
+// Accepts a variable number of QueryOptions, though only transactions are
+// currently supported.
 func (d *Database) GetResourceType(ctx context.Context, id string, opts ...QueryOption) (*ResourceType, error) {
 	var (
 		err    error
@@ -213,6 +229,9 @@ func (d *Database) GetResourceType(ctx context.Context, id string, opts ...Query
 	return &result, err
 }
 
+// GetResourceTypeByName returns a *ResourceType associated with the name passed
+// in. Accepts a variable number of QueryOptions, though only transactions are
+// currently supported.
 func (d *Database) GetResourceTypeByName(ctx context.Context, name string, opts ...QueryOption) (*ResourceType, error) {
 	var (
 		err          error
@@ -248,6 +267,9 @@ func (d *Database) GetResourceTypeByName(ctx context.Context, name string, opts 
 	return &resourceType, nil
 }
 
+// GetOperationID returns the UUID associated with the operation name passed in.
+// Accepts a variable number of QueryOptions, though only transactions are
+// currently supported.
 func (d *Database) GetOperationID(ctx context.Context, name string, opts ...QueryOption) (string, error) {
 	var (
 		err error
@@ -282,6 +304,9 @@ func (d *Database) GetOperationID(ctx context.Context, name string, opts ...Quer
 	return result, nil
 }
 
+// GetOperation returns a *UpdateOperation associated with the UUID passed in.
+// Accepts a variable number of QueryOptions, though only transactions are
+// currently supported.
 func (d *Database) GetOperation(ctx context.Context, id string, opts ...QueryOption) (*UpdateOperation, error) {
 	var (
 		err    error
@@ -315,6 +340,9 @@ func (d *Database) GetOperation(ctx context.Context, id string, opts ...QueryOpt
 	return &result, err
 }
 
+// GetUserID returns a user's UUID associated with their username.
+// Accepts a variable number of QueryOptions, though only WithTX is currently
+// supported.
 func (d *Database) GetUserID(ctx context.Context, username string, opts ...QueryOption) (string, error) {
 	var (
 		err error
@@ -349,6 +377,9 @@ func (d *Database) GetUserID(ctx context.Context, username string, opts ...Query
 	return result, nil
 }
 
+// GetUser returns a *User assocated with the UUID passed in.
+// Accepts a variable number of QueryOptions, though online WithTX is currently
+// supported.
 func (d *Database) GetUser(ctx context.Context, id string, opts ...QueryOption) (*User, error) {
 	var (
 		err    error
@@ -381,6 +412,9 @@ func (d *Database) GetUser(ctx context.Context, id string, opts ...QueryOption) 
 	return &result, nil
 }
 
+// GetActiveUserPlan returns the active user plan for the username passed in.
+// Accepts a variable number of QueryOptions, but only WithTX is currently
+// supported.
 func (d *Database) GetActiveUserPlan(ctx context.Context, username string, opts ...QueryOption) (*UserPlan, error) {
 	var (
 		err    error
@@ -446,6 +480,9 @@ func (d *Database) GetActiveUserPlan(ctx context.Context, username string, opts 
 	return &result, nil
 }
 
+// UserPlanUsages returns a list of Usages associated with a user plan specified
+// by the passed in UUID. Accepts a variable number of QueryOptions, though only
+// WithTX is currently supported.
 func (d *Database) UserPlanUsages(ctx context.Context, userPlanID string, opts ...QueryOption) ([]Usage, error) {
 	var (
 		err    error
@@ -488,6 +525,9 @@ func (d *Database) UserPlanUsages(ctx context.Context, userPlanID string, opts .
 	return usages, nil
 }
 
+// UserPlanQuotas returns a list of Quotas associated with the user plan specified
+// by the UUID passed in. Accepts a variable number of QueryOptions, though only
+// WithTX is currently supported.
 func (d *Database) UserPlanQuotas(ctx context.Context, userPlanID string, opts ...QueryOption) ([]Quota, error) {
 	var (
 		err    error
@@ -532,6 +572,9 @@ func (d *Database) UserPlanQuotas(ctx context.Context, userPlanID string, opts .
 	return quotas, nil
 }
 
+// UserPlanQuotaDefaults returns a list of PlanQuotaDefaults associated with the
+// plan (not user plan, just plan) specified by the UUID passed in. Accepts a
+// variable number of QueryOptions, though only WithTX is currently supported.
 func (d *Database) UserPlanQuotaDefaults(ctx context.Context, planID string, opts ...QueryOption) ([]PlanQuotaDefault, error) {
 	var (
 		err      error
@@ -573,6 +616,9 @@ func (d *Database) UserPlanQuotaDefaults(ctx context.Context, planID string, opt
 	return defaults, nil
 }
 
+// UserPlanDetails returns lists of PlanQuotaDefaults, Quotas, and Usages
+// Associated with the *UserPlan passed in. Accepts a variable number of
+// QuotaOptions, though only WithTX is currently supported.
 func (d *Database) UserPlanDetails(ctx context.Context, userPlan *UserPlan, opts ...QueryOption) ([]PlanQuotaDefault, []Quota, []Usage, error) {
 	var (
 		err      error
@@ -599,6 +645,9 @@ func (d *Database) UserPlanDetails(ctx context.Context, userPlan *UserPlan, opts
 	return defaults, quotas, usages, nil
 }
 
+// AddUserUpdate inserts the passed in update into the database. Returns the
+// Update with the UUID filled in. Accepts a variable number of QueryOptions,
+// though only WithTx is currently supported.
 func (d *Database) AddUserUpdate(ctx context.Context, update *Update, opts ...QueryOption) (*Update, error) {
 	var (
 		err error
@@ -640,6 +689,11 @@ func (d *Database) AddUserUpdate(ctx context.Context, update *Update, opts ...Qu
 	return update, nil
 }
 
+// GetCurrentUsage returns the current usage value for the resource type specifed
+// by the resource type UUID and associated with the user plan UUID passed in.
+// Also returns whether or not the usage was actually found or the default value
+// was returned. Accepts a variable number of QueryOptions, though only WithTX
+// is currently supported.
 func (d *Database) GetCurrentUsage(ctx context.Context, resourceTypeID, userPlanID string, opts ...QueryOption) (float64, bool, error) {
 	var (
 		err error
@@ -675,6 +729,11 @@ func (d *Database) GetCurrentUsage(ctx context.Context, resourceTypeID, userPlan
 	return usageValue, usageFound, nil
 }
 
+// GetCurrentQuota returns the current quota value for a resource type and
+// user plan. Also returns a boolean that is true when the actual quota value
+// was found and returned and is false when the actual quota was not found and
+// the default value was returned. Accepts a variable number of QuotaOptions,
+// but only WithTX is currently supported.
 func (d *Database) GetCurrentQuota(ctx context.Context, resourceTypeID, userPlanID string, opts ...QueryOption) (float64, bool, error) {
 	var (
 		err        error
@@ -714,6 +773,9 @@ func (d *Database) GetCurrentQuota(ctx context.Context, resourceTypeID, userPlan
 	return quotaValue, quotaFound, nil
 }
 
+// UpsertUsage will insert or update a record usage in the database for the
+// resource type and user plan indicated. Accepts a variable number of
+// QueryOptions, though only WithTX is currently supported.
 func (d *Database) UpsertUsage(ctx context.Context, update bool, value float64, resourceTypeID, userPlanID string, opts ...QueryOption) error {
 	var (
 		err error
@@ -761,6 +823,9 @@ func (d *Database) UpsertUsage(ctx context.Context, update bool, value float64, 
 	return nil
 }
 
+// UpsertQuota inserts or updates a quota into the database for the given
+// resource type and user plan. Accepts a variable number of QueryOptions,
+// though only WithTX is currently supported.
 func (d *Database) UpsertQuota(ctx context.Context, update bool, value float64, resourceTypeID, userPlanID string, opts ...QueryOption) error {
 	var (
 		err error
@@ -808,6 +873,10 @@ func (d *Database) UpsertQuota(ctx context.Context, update bool, value float64, 
 	return nil
 }
 
+// ProcessUpdateForUsage accepts a new *Update, inserts it into the database,
+// then uses it to calculate new usage and upsert it into the database. Does not
+// accept any QueryOptions since it sets up the transaction and other options
+// itself.
 func (d *Database) ProcessUpdateForUsage(ctx context.Context, update *Update) error {
 	log = log.WithFields(logrus.Fields{"context": "usage update", "user": update.User.Username})
 
@@ -860,6 +929,10 @@ func (d *Database) ProcessUpdateForUsage(ctx context.Context, update *Update) er
 	return nil
 }
 
+// ProcessUpdateForQuota accepts a new *Update, inserts it into the database,
+// then uses it to calculate a new usage value, which in turn is upserted into
+// the database. Does not accept an QueryOptions since it sets up the
+// transaction and other options itself.
 func (d *Database) ProcessUpdateForQuota(ctx context.Context, update *Update, opts ...QueryOption) error {
 	var err error
 
@@ -909,6 +982,10 @@ func (d *Database) ProcessUpdateForQuota(ctx context.Context, update *Update, op
 	return nil
 }
 
+// AddUsage upserts a new usage value, ignore the updates tables. Should only
+// be used to administratively update a usage value in the case where it gets
+// out of sync with the updates. Accepts a variable number of QueryOptions,
+// though only WithTX is currently supported.
 func (d *Database) AddUsage(ctx context.Context, updateType string, usage *Usage, opts ...QueryOption) error {
 	var (
 		err           error
@@ -939,6 +1016,8 @@ func (d *Database) AddUsage(ctx context.Context, updateType string, usage *Usage
 	return nil
 }
 
+// GetUserOverages returns a user's list of overages. Accepts a variable number
+// of QueryOptions, though only WithTX is currently supported.
 func (d *Database) GetUserOverages(ctx context.Context, username string, opts ...QueryOption) ([]Overage, error) {
 	var (
 		err      error
