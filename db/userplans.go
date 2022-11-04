@@ -102,8 +102,11 @@ func (d *Database) UserPlanUsages(ctx context.Context, userPlanID string, opts .
 		Select(
 			usagesT.Col("id").As("id"),
 			usagesT.Col("quota").As("quota"),
+			usagesT.Col("user_plan_id").As("user_plan_id"),
 			usagesT.Col("created_by").As("created_by"),
 			usagesT.Col("created_at").As("created_at"),
+			usagesT.Col("last_modified_by").As("last_modified_by"),
+			usagesT.Col("last_modified_at").As("last_modified_at"),
 			rtT.Col("id").As("resource_types.id"),
 			rtT.Col("name").As("resource_types.name"),
 			rtT.Col("unit").As("resource_types.unit"),
