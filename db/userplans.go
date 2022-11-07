@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/doug-martin/goqu/v9"
 )
@@ -65,7 +66,7 @@ func (d *Database) GetActiveUserPlan(ctx context.Context, username string, opts 
 		Limit(1).
 		Executor()
 
-	log.Debug(query.ToSQL())
+	fmt.Println(query.ToSQL())
 
 	if _, err = query.ScanStructContext(ctx, &result); err != nil {
 		return nil, err
