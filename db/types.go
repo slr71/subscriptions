@@ -110,7 +110,7 @@ type PlanQuotaDefault struct {
 
 type Usage struct {
 	ID             string       `db:"id" goqu:"defaultifempty"`
-	Usage          float64      `db:"usages"`
+	Usage          float64      `db:"usage"`
 	UserPlanID     string       `db:"user_plan_id"`
 	ResourceType   ResourceType `db:"resource_types"`
 	CreatedBy      string       `db:"created_by"`
@@ -122,7 +122,7 @@ type Usage struct {
 type Quota struct {
 	ID             string       `db:"id" goqu:"defaultifempty"`
 	Quota          float64      `db:"quota"`
-	ResourceType   ResourceType `db:"resource_type_id"`
+	ResourceType   ResourceType `db:"resource_types"`
 	UserPlan       UserPlan     `db:"user_plans"`
 	CreatedBy      string       `db:"created_by"`
 	CreatedAt      time.Time    `db:"created_at"`

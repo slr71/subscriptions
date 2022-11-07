@@ -44,17 +44,21 @@ func (a *App) GetUserSummary(subject, reply string, request *qms.RequestByUserna
 
 	d := db.New(a.db)
 
+	log.Debug("before getting the active user plan")
 	userPlan, err := d.GetActiveUserPlan(ctx, username)
 	if err != nil {
 		sendError(ctx, response, err)
 		return
 	}
+	log.Debug("after getting the active user plan")
 
+	log.Debug("before getting the user plan details")
 	defaults, quotas, usages, err := d.UserPlanDetails(ctx, userPlan)
 	if err != nil {
 		sendError(ctx, response, err)
 		return
 	}
+	log.Debug("affter getting the user plan details")
 
 	for _, pqd := range defaults {
 		def := &qms.QuotaDefault{

@@ -2,7 +2,6 @@ package db
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/doug-martin/goqu/v9"
 )
@@ -46,12 +45,12 @@ func (d *Database) GetActiveUserPlan(ctx context.Context, username string, opts 
 			userPlansT.Col("last_modified_by").As("last_modified_by"),
 			userPlansT.Col("last_modified_at").As("last_modified_at"),
 
-			usersT.Col("id").As("users.id"),
-			usersT.Col("username").As("users.username"),
+			usersT.Col("id").As(goqu.C("users.id")),
+			usersT.Col("username").As(goqu.C("users.username")),
 
-			plansT.Col("id").As("plans.id"),
-			plansT.Col("name").As("plans.name"),
-			plansT.Col("description").As("plans.description"),
+			plansT.Col("id").As(goqu.C("plans.id")),
+			plansT.Col("name").As(goqu.C("plans.name")),
+			plansT.Col("description").As(goqu.C("plans.description")),
 		).
 		Join(usersT, goqu.On(userPlansT.Col("user_id").Eq(usersT.Col("id")))).
 		Join(plansT, goqu.On(userPlansT.Col("plan_id").Eq(plansT.Col("id")))).
@@ -66,11 +65,11 @@ func (d *Database) GetActiveUserPlan(ctx context.Context, username string, opts 
 		Limit(1).
 		Executor()
 
-	fmt.Println(query.ToSQL())
-
 	if _, err = query.ScanStructContext(ctx, &result); err != nil {
 		return nil, err
 	}
+
+	log.Debugf("%+v", result)
 
 	return &result, nil
 }
@@ -102,15 +101,15 @@ func (d *Database) UserPlanUsages(ctx context.Context, userPlanID string, opts .
 	usagesQuery := db.From(usagesT).
 		Select(
 			usagesT.Col("id").As("id"),
-			usagesT.Col("quota").As("quota"),
+			usagesT.Col("usage").As("usage"),
 			usagesT.Col("user_plan_id").As("user_plan_id"),
 			usagesT.Col("created_by").As("created_by"),
 			usagesT.Col("created_at").As("created_at"),
 			usagesT.Col("last_modified_by").As("last_modified_by"),
 			usagesT.Col("last_modified_at").As("last_modified_at"),
-			rtT.Col("id").As(`"resource_types.id"`),
-			rtT.Col("name").As(`"resource_types.name"`),
-			rtT.Col("unit").As(`"resource_types.unit"`),
+			rtT.Col("id").As(goqu.C("resource_types.id")),
+			rtT.Col("name").As(goqu.C("resource_types.name")),
+			rtT.Col("unit").As(goqu.C("resource_types.unit")),
 		).
 		Join(rtT, goqu.On(goqu.I("usages.resource_type_id").Eq(goqu.I("resource_types.id")))).
 		Where(usagesT.Col("user_plan_id").Eq(userPlanID)).
@@ -155,9 +154,9 @@ func (d *Database) UserPlanQuotas(ctx context.Context, userPlanID string, opts .
 			quotasT.Col("created_at").As("created_at"),
 			quotasT.Col("last_modified_by").As("last_modified_by"),
 			quotasT.Col("last_modified_at").As("last_modified_at"),
-			rtT.Col("id").As("resource_types.id"),
-			rtT.Col("name").As("resource_types.name"),
-			rtT.Col("unit").As("resource_types.unit"),
+			rtT.Col("id").As(goqu.C("resource_types.id")),
+			rtT.Col("name").As(goqu.C("resource_types.name")),
+			rtT.Col("unit").As(goqu.C("resource_types.unit")),
 		).
 		Join(rtT, goqu.On(goqu.I("quotas.resource_type_id").Eq(goqu.I("resource_types.id")))).
 		Where(quotasT.Col("user_plan_id").Eq(userPlanID)).
@@ -199,9 +198,9 @@ func (d *Database) UserPlanQuotaDefaults(ctx context.Context, planID string, opt
 			pqdT.Col("id").As("id"),
 			pqdT.Col("quota_value").As("quota_value"),
 			pqdT.Col("plan_id").As("plan_id"),
-			rtT.Col("id").As("resource_types.id"),
-			rtT.Col("name").As("resource_types.name"),
-			rtT.Col("unit").As("resource_types.unit"),
+			rtT.Col("id").As(goqu.C("resource_types.id")),
+			rtT.Col("name").As(goqu.C("resource_types.name")),
+			rtT.Col("unit").As(goqu.C("resource_types.unit")),
 		).
 		Join(rtT, goqu.On(goqu.I("plan_quota_defaults.resource_type_id").Eq(goqu.I("resource_types.id")))).
 		Where(pqdT.Col("plan_id").Eq(planID)).
@@ -225,20 +224,26 @@ func (d *Database) UserPlanDetails(ctx context.Context, userPlan *UserPlan, opts
 		quotas   []Quota
 	)
 
+	log.Debug("before getting user plan quota defaults")
 	defaults, err = d.UserPlanQuotaDefaults(ctx, userPlan.Plan.ID, opts...)
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	log.Debug("after getting user plan quota defaults")
 
+	log.Debug("before getting user plan quotas")
 	quotas, err = d.UserPlanQuotas(ctx, userPlan.ID, opts...)
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	log.Debug("after getting user plan quotas")
 
+	log.Debug("before getting user plan usages")
 	usages, err = d.UserPlanUsages(ctx, userPlan.ID, opts...)
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	log.Debug("after getting user plan usages")
 
 	return defaults, quotas, usages, nil
 }
