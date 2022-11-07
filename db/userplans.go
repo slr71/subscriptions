@@ -46,17 +46,17 @@ func (d *Database) GetActiveUserPlan(ctx context.Context, username string, opts 
 			userPlansT.Col("last_modified_by").As("last_modified_by"),
 			userPlansT.Col("last_modified_at").As("last_modified_at"),
 
-			usersT.Col("id").As(goqu.C("users.id")),
-			usersT.Col("username").As(goqu.C("users.username")),
+			usersT.Col("id").As(goqu.L(`"users.id"`)),
+			usersT.Col("username").As(goqu.L(`"users.username"`)),
 
-			plansT.Col("id").As(goqu.C("plans.id")),
-			plansT.Col("name").As(goqu.C("plans.name")),
-			plansT.Col("description").As(goqu.C("plans.description")),
+			plansT.Col("id").As(goqu.L(`"plans.id"`)),
+			plansT.Col("name").As(goqu.L(`"plans.name"`)),
+			plansT.Col("description").As(goqu.L(`"plans.description"`)),
 		).
-		Join(usersT, goqu.On(goqu.I("user_plans.user_id").Eq(goqu.I("users.id")))).
-		Join(plansT, goqu.On(goqu.I("user_plans.plan_id").Eq(goqu.I("plans.id")))).
+		Join(usersT, goqu.On(userPlansT.Col("user_id").Eq(usersT.Col("id")))).
+		Join(plansT, goqu.On(userPlansT.Col("plan_id").Eq(plansT.Col("id")))).
 		Where(goqu.And(
-			goqu.I("users.username").Eq(username),
+			usersT.Col("username").Eq(username),
 			goqu.Or(
 				currTS.Between(goqu.Range(effStartDate, effEndDate)),
 				goqu.And(currTS.Gt(effStartDate), effEndDate.Is(nil)),
@@ -108,9 +108,9 @@ func (d *Database) UserPlanUsages(ctx context.Context, userPlanID string, opts .
 			usagesT.Col("created_at").As("created_at"),
 			usagesT.Col("last_modified_by").As("last_modified_by"),
 			usagesT.Col("last_modified_at").As("last_modified_at"),
-			rtT.Col("id").As("resource_types.id"),
-			rtT.Col("name").As("resource_types.name"),
-			rtT.Col("unit").As("resource_types.unit"),
+			rtT.Col("id").As(`"resource_types.id"`),
+			rtT.Col("name").As(`"resource_types.name"`),
+			rtT.Col("unit").As(`"resource_types.unit"`),
 		).
 		Join(rtT, goqu.On(goqu.I("usages.resource_type_id").Eq(goqu.I("resource_types.id")))).
 		Where(usagesT.Col("user_plan_id").Eq(userPlanID)).
