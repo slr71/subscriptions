@@ -46,12 +46,12 @@ func (d *Database) GetActiveUserPlan(ctx context.Context, username string, opts 
 			userPlansT.Col("last_modified_by").As("last_modified_by"),
 			userPlansT.Col("last_modified_at").As("last_modified_at"),
 
-			usersT.Col("id").As(goqu.L(`"users.id"`)),
-			usersT.Col("username").As(goqu.L(`"users.username"`)),
+			usersT.Col("id").As("users.id"),
+			usersT.Col("username").As("users.username"),
 
-			plansT.Col("id").As(goqu.L(`"plans.id"`)),
-			plansT.Col("name").As(goqu.L(`"plans.name"`)),
-			plansT.Col("description").As(goqu.L(`"plans.description"`)),
+			plansT.Col("id").As("plans.id"),
+			plansT.Col("name").As("plans.name"),
+			plansT.Col("description").As("plans.description"),
 		).
 		Join(usersT, goqu.On(userPlansT.Col("user_id").Eq(usersT.Col("id")))).
 		Join(plansT, goqu.On(userPlansT.Col("plan_id").Eq(plansT.Col("id")))).
