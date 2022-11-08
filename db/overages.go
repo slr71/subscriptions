@@ -38,16 +38,16 @@ func (d *Database) GetUserOverages(ctx context.Context, username string, opts ..
 		Select(
 			userPlansT.Col("id").As("user_plan_id"),
 
-			usersT.Col("id").As("users.id"),
-			usersT.Col("username").As("users.username"),
+			usersT.Col("id").As(goqu.C("users.id")),
+			usersT.Col("username").As(goqu.C("users.username")),
 
-			plansT.Col("id").As("plans.id"),
-			plansT.Col("name").As("plans.name"),
-			plansT.Col("description").As("plans.description"),
+			plansT.Col("id").As(goqu.C("plans.id")),
+			plansT.Col("name").As(goqu.C("plans.name")),
+			plansT.Col("description").As(goqu.C("plans.description")),
 
-			rtT.Col("id").As("resource_types.id"),
-			rtT.Col("name").As("resource_types.name"),
-			rtT.Col("unit").As("resource_types.unit"),
+			rtT.Col("id").As(goqu.C("resource_types.id")),
+			rtT.Col("name").As(goqu.C("resource_types.name")),
+			rtT.Col("unit").As(goqu.C("resource_types.unit")),
 
 			quotasT.Col("quota").As("quota_value"),
 			usagesT.Col("usage").As("usage_value"),
