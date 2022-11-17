@@ -58,7 +58,7 @@ func (d *Database) GetUserOverages(ctx context.Context, username string, opts ..
 		Join(usagesT, goqu.On(userPlansT.Col("id").Eq(usagesT.Col("user_plan_id")))).
 		Join(rtT, goqu.On(usagesT.Col("resource_type_id").Eq(rtT.Col("id")))).
 		Where(goqu.And(
-			usagesT.Col("username").Eq(username),
+			usersT.Col("username").Eq(username),
 			goqu.Or(
 				ct.Between(goqu.Range(userPlansT.Col("effective_start_date"), userPlansT.Col("effective_end_date"))),
 				goqu.And(
