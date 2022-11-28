@@ -8,6 +8,7 @@ import (
 	"github.com/cyverse-de/subscriptions/db"
 	"github.com/cyverse-de/subscriptions/errors"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func (a *App) GetUsagesHandler(subject, reply string, request *qms.GetUsages) {
@@ -58,6 +59,10 @@ func (a *App) GetUsagesHandler(subject, reply string, request *qms.GetUsages) {
 				Name: usage.ResourceType.Name,
 				Unit: usage.ResourceType.Unit,
 			},
+			CreatedAt:      timestamppb.New(usage.CreatedAt),
+			CreatedBy:      usage.CreatedBy,
+			LastModifiedBy: usage.LastModifiedBy,
+			LastModifiedAt: timestamppb.New(usage.LastModifiedAt),
 		})
 	}
 
