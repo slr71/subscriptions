@@ -40,6 +40,8 @@ github.com/cyverse-de/p/go/monitoring v0.0.2 h1:oI/zt2a7k66JOKs9z+3QT7EzRYbPee+m
 github.com/cyverse-de/p/go/monitoring v0.0.2/go.mod h1:UzSOg02RZ3GEm8iuQu39Hbo8rnYDfZ5XzZnN8UQYCyY=
 github.com/cyverse-de/p/go/qms v0.0.10 h1:yfwNZtHIF1nx5r3RDXZz4iCvEhV17aXZeHtpPn48p9M=
 github.com/cyverse-de/p/go/qms v0.0.10/go.mod h1:149A1Fx/vO7ovgEXaodYCLPvsX1squLb7u6MaSya3oM=
+github.com/cyverse-de/p/go/qms v0.0.12 h1:wdMDlyoZaKL5oLMRuBajKgva2VoKxOJQ8/820gg4kr4=
+github.com/cyverse-de/p/go/qms v0.0.12/go.mod h1:149A1Fx/vO7ovgEXaodYCLPvsX1squLb7u6MaSya3oM=
 github.com/cyverse-de/p/go/svcerror v0.0.5 h1:WbUcU4VjbNU0agfrHJOCy9orAY72WJWo92b1vR3+3sw=
 github.com/cyverse-de/p/go/svcerror v0.0.5/go.mod h1:WCGIrhW0KXtSu86YhjU/JXG8LrZs5wJPBCH4wvnFYcQ=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
