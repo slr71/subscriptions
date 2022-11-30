@@ -66,6 +66,8 @@ func (d *Database) GetUserOverages(ctx context.Context, username string, opts ..
 					userPlansT.Col("effective_end_date").IsNull(),
 				),
 			),
+			usagesT.Col("resource_type_id").Eq(quotasT.Col("resource_type_id")),
+			usagesT.Col("usage").Gte(quotasT.Col("quota")),
 		)).Executor()
 
 	if err = query.ScanStructsContext(ctx, &overages); err != nil {
