@@ -75,7 +75,7 @@ func (d *Database) UpsertQuota(ctx context.Context, update bool, value float64, 
 		"quota":            value,
 		"resource_type_id": resourceTypeID,
 		"user_plan_id":     userPlanID,
-		"create_by":        "de",
+		"created_by":       "de",
 		"last_modified_by": "de",
 	}
 
