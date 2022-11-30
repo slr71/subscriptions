@@ -82,6 +82,10 @@ func (a *App) GetUserSummary(subject, reply string, request *qms.RequestByUserna
 				Name: quota.ResourceType.Name,
 				Unit: quota.ResourceType.Unit,
 			},
+			CreatedBy:      quota.CreatedBy,
+			CreatedAt:      timestamppb.New(quota.CreatedAt),
+			LastModifiedBy: quota.LastModifiedBy,
+			LastModifiedAt: timestamppb.New(quota.LastModifiedAt),
 		}
 		qs = append(qs, q)
 	}
@@ -96,6 +100,10 @@ func (a *App) GetUserSummary(subject, reply string, request *qms.RequestByUserna
 				Name: usage.ResourceType.Name,
 				Unit: usage.ResourceType.Unit,
 			},
+			CreatedBy:      usage.CreatedBy,
+			CreatedAt:      timestamppb.New(usage.CreatedAt),
+			LastModifiedBy: usage.LastModifiedBy,
+			LastModifiedAt: timestamppb.New(usage.LastModifiedAt),
 		}
 		us = append(us, u)
 	}
