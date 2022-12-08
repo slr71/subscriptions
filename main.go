@@ -15,7 +15,7 @@ import (
 	"github.com/cyverse-de/go-mod/logging"
 	"github.com/cyverse-de/go-mod/otelutils"
 	"github.com/cyverse-de/go-mod/protobufjson"
-	"github.com/cyverse-de/go-mod/subjects"
+	qmssubs "github.com/cyverse-de/go-mod/subjects/qms"
 	"github.com/cyverse-de/subscriptions/app"
 	"github.com/cyverse-de/subscriptions/natscl"
 	"github.com/jmoiron/sqlx"
@@ -139,19 +139,19 @@ func main() {
 
 	a := app.New(natsClient, dbconn, userSuffix)
 
-	natsClient.Subscribe(subjects.QMSGetUserUpdates, a.GetUserUpdatesHandler)
-	natsClient.Subscribe(subjects.QMSAddUserUpdate, a.AddUserUpdateHandler)
+	natsClient.Subscribe(qmssubs.GetUserUpdates, a.GetUserUpdatesHandler)
+	natsClient.Subscribe(qmssubs.AddUserUpdate, a.AddUserUpdateHandler)
 
 	// Only call these two endpoints if you need to correct a usage value and
 	// bypass the updates tables.
-	natsClient.Subscribe(subjects.QMSGetUserUsages, a.GetUsagesHandler)
-	natsClient.Subscribe(subjects.QMSAddUserUsages, a.AddUsageHandler)
+	natsClient.Subscribe(qmssubs.GetUserUsages, a.GetUsagesHandler)
+	natsClient.Subscribe(qmssubs.AddUserUsages, a.AddUsageHandler)
 
 	// These will get used by frontend calls to check for user overages.
-	natsClient.Subscribe(subjects.QMSGetUserOverages, a.GetUserOverages)
-	natsClient.Subscribe(subjects.QMSCheckUserOverages, a.CheckUserOverages)
+	natsClient.Subscribe(qmssubs.GetUserOverages, a.GetUserOverages)
+	natsClient.Subscribe(qmssubs.CheckUserOverages, a.CheckUserOverages)
 
-	natsClient.Subscribe(subjects.QMSUserSummary, a.GetUserSummary)
+	natsClient.Subscribe(qmssubs.UserSummary, a.GetUserSummary)
 
 	srv := fmt.Sprintf(":%s", strconv.Itoa(*listenPort))
 	log.Fatal(http.ListenAndServe(srv, nil))
