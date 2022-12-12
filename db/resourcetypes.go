@@ -92,16 +92,7 @@ func (d *Database) GetResourceTypeByName(ctx context.Context, name string, opts 
 		resourceType ResourceType
 	)
 
-	querySettings := &QuerySettings{}
-	for _, opt := range opts {
-		opt(querySettings)
-	}
-
-	if querySettings.tx != nil {
-		db = querySettings.tx
-	} else {
-		db = d.goquDB
-	}
+	_, db = d.querySettings(opts...)
 
 	rtT := goqu.T("resource_types")
 	query := db.From(rtT).

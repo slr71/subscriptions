@@ -15,16 +15,7 @@ func (d *Database) GetUserID(ctx context.Context, username string, opts ...Query
 		db  GoquDatabase
 	)
 
-	querySettings := &QuerySettings{}
-	for _, opt := range opts {
-		opt(querySettings)
-	}
-
-	if querySettings.tx != nil {
-		db = querySettings.tx
-	} else {
-		db = d.goquDB
-	}
+	_, db = d.querySettings(opts...)
 
 	usersT := goqu.T("users")
 	query := db.From(usersT).
@@ -53,16 +44,7 @@ func (d *Database) GetUser(ctx context.Context, id string, opts ...QueryOption) 
 		result User
 	)
 
-	querySettings := &QuerySettings{}
-	for _, opt := range opts {
-		opt(querySettings)
-	}
-
-	if querySettings.tx != nil {
-		db = querySettings.tx
-	} else {
-		db = d.goquDB
-	}
+	_, db = d.querySettings(opts...)
 
 	usersT := goqu.T("users")
 	query := db.From(usersT).
@@ -84,16 +66,7 @@ func (d *Database) UserExists(ctx context.Context, username string, opts ...Quer
 		db  GoquDatabase
 	)
 
-	querySettings := &QuerySettings{}
-	for _, opt := range opts {
-		opt(querySettings)
-	}
-
-	if querySettings.tx != nil {
-		db = querySettings.tx
-	} else {
-		db = d.goquDB
-	}
+	_, db = d.querySettings(opts...)
 
 	users := goqu.T("users")
 	count, err := db.From(users).Where(users.Col("username").Eq(username)).Count()
@@ -110,16 +83,7 @@ func (d *Database) AddUser(ctx context.Context, username string, opts ...QueryOp
 		db  GoquDatabase
 	)
 
-	querySettings := &QuerySettings{}
-	for _, opt := range opts {
-		opt(querySettings)
-	}
-
-	if querySettings.tx != nil {
-		db = querySettings.tx
-	} else {
-		db = d.goquDB
-	}
+	_, db = d.querySettings(opts...)
 
 	ds := db.Insert("users").Rows(
 		goqu.Record{

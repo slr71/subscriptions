@@ -17,16 +17,7 @@ func (d *Database) GetActiveUserPlan(ctx context.Context, username string, opts 
 		db     GoquDatabase
 	)
 
-	querySettings := &QuerySettings{}
-	for _, opt := range opts {
-		opt(querySettings)
-	}
-
-	if querySettings.tx != nil {
-		db = querySettings.tx
-	} else {
-		db = d.goquDB
-	}
+	_, db = d.querySettings(opts...)
 
 	userPlansT := goqu.T("user_plans")
 	usersT := goqu.T("users")
@@ -195,16 +186,7 @@ func (d *Database) UserPlanUsages(ctx context.Context, userPlanID string, opts .
 		usages []Usage
 	)
 
-	querySettings := &QuerySettings{}
-	for _, opt := range opts {
-		opt(querySettings)
-	}
-
-	if querySettings.tx != nil {
-		db = querySettings.tx
-	} else {
-		db = d.goquDB
-	}
+	_, db = d.querySettings(opts...)
 
 	usagesT := goqu.T("usages")
 	rtT := goqu.T("resource_types")
@@ -243,16 +225,7 @@ func (d *Database) UserPlanQuotas(ctx context.Context, userPlanID string, opts .
 		quotas []Quota
 	)
 
-	querySettings := &QuerySettings{}
-	for _, opt := range opts {
-		opt(querySettings)
-	}
-
-	if querySettings.tx != nil {
-		db = querySettings.tx
-	} else {
-		db = d.goquDB
-	}
+	_, db = d.querySettings(opts...)
 
 	rtT := goqu.T("resource_types")
 	quotasT := goqu.T("quotas")
@@ -290,16 +263,7 @@ func (d *Database) UserPlanQuotaDefaults(ctx context.Context, planID string, opt
 		defaults []PlanQuotaDefault
 	)
 
-	querySettings := &QuerySettings{}
-	for _, opt := range opts {
-		opt(querySettings)
-	}
-
-	if querySettings.tx != nil {
-		db = querySettings.tx
-	} else {
-		db = d.goquDB
-	}
+	_, db = d.querySettings(opts...)
 
 	pqdT := goqu.T("plan_quota_defaults")
 	rtT := goqu.T("resource_types")

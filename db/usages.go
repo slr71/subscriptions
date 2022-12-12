@@ -19,16 +19,7 @@ func (d *Database) GetCurrentUsage(ctx context.Context, resourceTypeID, userPlan
 		db  GoquDatabase
 	)
 
-	querySettings := &QuerySettings{}
-	for _, opt := range opts {
-		opt(querySettings)
-	}
-
-	if querySettings.tx != nil {
-		db = querySettings.tx
-	} else {
-		db = d.goquDB
-	}
+	_, db = d.querySettings(opts...)
 
 	usagesE := db.From("usages").
 		Select(goqu.C("usage")).
@@ -57,16 +48,7 @@ func (d *Database) UpsertUsage(ctx context.Context, update bool, value float64, 
 		db  GoquDatabase
 	)
 
-	querySettings := &QuerySettings{}
-	for _, opt := range opts {
-		opt(querySettings)
-	}
-
-	if querySettings.tx != nil {
-		db = querySettings.tx
-	} else {
-		db = d.goquDB
-	}
+	_, db = d.querySettings(opts...)
 
 	updateRecord := goqu.Record{
 		"usage":            value,

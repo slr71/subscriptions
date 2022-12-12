@@ -15,16 +15,7 @@ func (d *Database) GetUserOverages(ctx context.Context, username string, opts ..
 		overages []Overage
 	)
 
-	querySettings := &QuerySettings{}
-	for _, opt := range opts {
-		opt(querySettings)
-	}
-
-	if querySettings.tx != nil {
-		db = querySettings.tx
-	} else {
-		db = d.goquDB
-	}
+	_, db = d.querySettings(opts...)
 
 	usersT := goqu.T("users")
 	userPlansT := goqu.T("user_plans")

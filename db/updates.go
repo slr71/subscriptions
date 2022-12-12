@@ -17,16 +17,7 @@ func (d *Database) UserUpdates(ctx context.Context, username string, opts ...Que
 		db  GoquDatabase
 	)
 
-	querySettings := &QuerySettings{}
-	for _, opt := range opts {
-		opt(querySettings)
-	}
-
-	if querySettings.tx != nil {
-		db = querySettings.tx
-	} else {
-		db = d.goquDB
-	}
+	querySettings, db := d.querySettings(opts...)
 
 	opsT := goqu.T("update_operations")
 	updatesT := goqu.T("updates")
@@ -103,16 +94,7 @@ func (d *Database) AddUserUpdate(ctx context.Context, update *Update, opts ...Qu
 		db  GoquDatabase
 	)
 
-	querySettings := &QuerySettings{}
-	for _, opt := range opts {
-		opt(querySettings)
-	}
-
-	if querySettings.tx != nil {
-		db = querySettings.tx
-	} else {
-		db = d.goquDB
-	}
+	_, db = d.querySettings(opts...)
 
 	ds := db.Insert("updates").Rows(
 		goqu.Record{

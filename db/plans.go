@@ -13,16 +13,7 @@ func (d *Database) GetPlanByID(ctx context.Context, planID string, opts ...Query
 		plan Plan
 	)
 
-	querySettings := &QuerySettings{}
-	for _, opt := range opts {
-		opt(querySettings)
-	}
-
-	if querySettings.tx != nil {
-		db = querySettings.tx
-	} else {
-		db = d.goquDB
-	}
+	_, db = d.querySettings(opts...)
 
 	plans := goqu.T("plans")
 	qd := goqu.T("plan_quota_defaults")
@@ -62,16 +53,7 @@ func (d *Database) GetPlanByName(ctx context.Context, name string, opts ...Query
 		plan Plan
 	)
 
-	querySettings := &QuerySettings{}
-	for _, opt := range opts {
-		opt(querySettings)
-	}
-
-	if querySettings.tx != nil {
-		db = querySettings.tx
-	} else {
-		db = d.goquDB
-	}
+	_, db = d.querySettings(opts...)
 
 	plans := goqu.T("plans")
 	qd := goqu.T("plan_quota_defaults")

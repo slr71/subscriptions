@@ -15,16 +15,7 @@ func (d *Database) GetOperationID(ctx context.Context, name string, opts ...Quer
 		db  GoquDatabase
 	)
 
-	querySettings := &QuerySettings{}
-	for _, opt := range opts {
-		opt(querySettings)
-	}
-
-	if querySettings.tx != nil {
-		db = querySettings.tx
-	} else {
-		db = d.goquDB
-	}
+	_, db = d.querySettings(opts...)
 
 	opT := goqu.T("update_operations")
 	query := db.From(opT).
@@ -53,16 +44,7 @@ func (d *Database) GetOperation(ctx context.Context, id string, opts ...QueryOpt
 		result UpdateOperation
 	)
 
-	querySettings := &QuerySettings{}
-	for _, opt := range opts {
-		opt(querySettings)
-	}
-
-	if querySettings.tx != nil {
-		db = querySettings.tx
-	} else {
-		db = d.goquDB
-	}
+	_, db = d.querySettings(opts...)
 
 	opT := goqu.T("update_operations")
 	query := db.From(opT).
