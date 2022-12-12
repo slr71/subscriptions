@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 
+	t "github.com/cyverse-de/subscriptions/db/tables"
 	"github.com/doug-martin/goqu/v9"
 )
 
@@ -26,8 +27,7 @@ func (d *Database) GetResourceTypeID(ctx context.Context, name, unit string, opt
 		db = d.goquDB
 	}
 
-	rtT := goqu.T("resource_types")
-	query := db.From(rtT).
+	query := db.From(t.RT).
 		Select("id").
 		Where(goqu.Ex{
 			"name": name,
@@ -65,14 +65,13 @@ func (d *Database) GetResourceType(ctx context.Context, id string, opts ...Query
 		db = d.goquDB
 	}
 
-	rtT := goqu.T("resource_types")
-	query := db.From(rtT).
+	query := db.From(t.RT).
 		Select(
-			rtT.Col("id"),
-			rtT.Col("name"),
-			rtT.Col("unit"),
+			t.RT.Col("id"),
+			t.RT.Col("name"),
+			t.RT.Col("unit"),
 		).
-		Where(rtT.Col("id").Eq(id)).
+		Where(t.RT.Col("id").Eq(id)).
 		Executor()
 
 	if _, err = query.ScanStructContext(ctx, &result); err != nil {
@@ -94,14 +93,13 @@ func (d *Database) GetResourceTypeByName(ctx context.Context, name string, opts 
 
 	_, db = d.querySettings(opts...)
 
-	rtT := goqu.T("resource_types")
-	query := db.From(rtT).
+	query := db.From(t.RT).
 		Select(
-			rtT.Col("id"),
-			rtT.Col("name"),
-			rtT.Col("unit"),
+			t.RT.Col("id"),
+			t.RT.Col("name"),
+			t.RT.Col("unit"),
 		).
-		Where(rtT.Col("name").Eq(name)).
+		Where(t.RT.Col("name").Eq(name)).
 		Executor()
 
 	if _, err = query.ScanStructContext(ctx, &resourceType); err != nil {

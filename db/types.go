@@ -33,6 +33,8 @@ type GoquDatabase interface {
 	Update(table interface{}) *goqu.UpdateDataset
 }
 
+var CurrentTimestamp = goqu.L("CURRENT_TIMESTAMP")
+
 var UpdateOperationNames = []string{"ADD", "SET"}
 
 const UsagesTrackedMetric = "usages"

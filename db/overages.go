@@ -5,6 +5,7 @@ package db
 import (
 	"context"
 
+	t "github.com/cyverse-de/subscriptions/db/tables"
 	"github.com/doug-martin/goqu/v9"
 )
 
@@ -17,48 +18,40 @@ func (d *Database) GetUserOverages(ctx context.Context, username string, opts ..
 
 	_, db = d.querySettings(opts...)
 
-	usersT := goqu.T("users")
-	userPlansT := goqu.T("user_plans")
-	plansT := goqu.T("plans")
-	rtT := goqu.T("resource_types")
-	quotasT := goqu.T("quotas")
-	usagesT := goqu.T("usages")
-	ct := goqu.L("CURRENT_TIMESTAMP")
-
-	query := db.From(userPlansT).
+	query := db.From(t.UserPlans).
 		Select(
-			userPlansT.Col("id").As("user_plan_id"),
+			t.UserPlans.Col("id").As("user_plan_id"),
 
-			usersT.Col("id").As(goqu.C("users.id")),
-			usersT.Col("username").As(goqu.C("users.username")),
+			t.Users.Col("id").As(goqu.C("users.id")),
+			t.Users.Col("username").As(goqu.C("users.username")),
 
-			plansT.Col("id").As(goqu.C("plans.id")),
-			plansT.Col("name").As(goqu.C("plans.name")),
-			plansT.Col("description").As(goqu.C("plans.description")),
+			t.Plans.Col("id").As(goqu.C("plans.id")),
+			t.Plans.Col("name").As(goqu.C("plans.name")),
+			t.Plans.Col("description").As(goqu.C("plans.description")),
 
-			rtT.Col("id").As(goqu.C("resource_types.id")),
-			rtT.Col("name").As(goqu.C("resource_types.name")),
-			rtT.Col("unit").As(goqu.C("resource_types.unit")),
+			t.ResourceTypes.Col("id").As(goqu.C("resource_types.id")),
+			t.ResourceTypes.Col("name").As(goqu.C("resource_types.name")),
+			t.ResourceTypes.Col("unit").As(goqu.C("resource_types.unit")),
 
-			quotasT.Col("quota").As("quota_value"),
-			usagesT.Col("usage").As("usage_value"),
+			t.Quotas.Col("quota").As("quota_value"),
+			t.Usages.Col("usage").As("usage_value"),
 		).
-		Join(usersT, goqu.On(userPlansT.Col("user_id").Eq(usersT.Col("id")))).
-		Join(plansT, goqu.On(userPlansT.Col("plan_id").Eq(plansT.Col("id")))).
-		Join(quotasT, goqu.On(userPlansT.Col("id").Eq(quotasT.Col("user_plan_id")))).
-		Join(usagesT, goqu.On(userPlansT.Col("id").Eq(usagesT.Col("user_plan_id")))).
-		Join(rtT, goqu.On(usagesT.Col("resource_type_id").Eq(rtT.Col("id")))).
+		Join(t.Users, goqu.On(t.UserPlans.Col("user_id").Eq(t.Users.Col("id")))).
+		Join(t.Plans, goqu.On(t.UserPlans.Col("plan_id").Eq(t.Plans.Col("id")))).
+		Join(t.Quotas, goqu.On(t.UserPlans.Col("id").Eq(t.Quotas.Col("user_plan_id")))).
+		Join(t.Usages, goqu.On(t.UserPlans.Col("id").Eq(t.Usages.Col("user_plan_id")))).
+		Join(t.ResourceTypes, goqu.On(t.Usages.Col("resource_type_id").Eq(t.ResourceTypes.Col("id")))).
 		Where(goqu.And(
-			usersT.Col("username").Eq(username),
+			t.Users.Col("username").Eq(username),
 			goqu.Or(
-				ct.Between(goqu.Range(userPlansT.Col("effective_start_date"), userPlansT.Col("effective_end_date"))),
+				CurrentTimestamp.Between(goqu.Range(t.UserPlans.Col("effective_start_date"), t.UserPlans.Col("effective_end_date"))),
 				goqu.And(
-					ct.Gt(userPlansT.Col("effective_start_date")),
-					userPlansT.Col("effective_end_date").IsNull(),
+					CurrentTimestamp.Gt(t.UserPlans.Col("effective_start_date")),
+					t.UserPlans.Col("effective_end_date").IsNull(),
 				),
 			),
-			usagesT.Col("resource_type_id").Eq(quotasT.Col("resource_type_id")),
-			usagesT.Col("usage").Gte(quotasT.Col("quota")),
+			t.Usages.Col("resource_type_id").Eq(t.Quotas.Col("resource_type_id")),
+			t.Usages.Col("usage").Gte(t.Quotas.Col("quota")),
 		)).Executor()
 
 	if err = query.ScanStructsContext(ctx, &overages); err != nil {
