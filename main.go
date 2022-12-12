@@ -139,19 +139,36 @@ func main() {
 
 	a := app.New(natsClient, dbconn, userSuffix)
 
-	natsClient.Subscribe(qmssubs.GetUserUpdates, a.GetUserUpdatesHandler)
-	natsClient.Subscribe(qmssubs.AddUserUpdate, a.AddUserUpdateHandler)
+	if err = natsClient.Subscribe(qmssubs.GetUserUpdates, a.GetUserUpdatesHandler); err != nil {
+		log.Fatal(err)
+	}
+	if err = natsClient.Subscribe(qmssubs.AddUserUpdate, a.AddUserUpdateHandler); err != nil {
+		log.Fatal(err)
+	}
 
 	// Only call these two endpoints if you need to correct a usage value and
 	// bypass the updates tables.
-	natsClient.Subscribe(qmssubs.GetUserUsages, a.GetUsagesHandler)
-	natsClient.Subscribe(qmssubs.AddUserUsages, a.AddUsageHandler)
+	if err = natsClient.Subscribe(qmssubs.GetUserUsages, a.GetUsagesHandler); err != nil {
+		log.Fatal(err)
+	}
+	if err = natsClient.Subscribe(qmssubs.AddUserUsages, a.AddUsageHandler); err != nil {
+		log.Fatal(err)
+	}
 
 	// These will get used by frontend calls to check for user overages.
-	natsClient.Subscribe(qmssubs.GetUserOverages, a.GetUserOverages)
-	natsClient.Subscribe(qmssubs.CheckUserOverages, a.CheckUserOverages)
+	if err = natsClient.Subscribe(qmssubs.GetUserOverages, a.GetUserOverages); err != nil {
+		log.Fatal(err)
+	}
+	if err = natsClient.Subscribe(qmssubs.CheckUserOverages, a.CheckUserOverages); err != nil {
+		log.Fatal(err)
+	}
 
-	natsClient.Subscribe(qmssubs.UserSummary, a.GetUserSummary)
+	if err = natsClient.Subscribe(qmssubs.UserSummary, a.GetUserSummary); err != nil {
+		log.Fatal(err)
+	}
+	if err = natsClient.Subscribe(qmssubs.AddUser, a.AddUserHandler); err != nil {
+		log.Fatal(err)
+	}
 
 	srv := fmt.Sprintf(":%s", strconv.Itoa(*listenPort))
 	log.Fatal(http.ListenAndServe(srv, nil))

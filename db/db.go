@@ -26,6 +26,27 @@ func New(dbconn *sqlx.DB) *Database {
 	}
 }
 
+func (d *Database) Begin() (*goqu.TxDatabase, error) {
+	return d.fullDB.Begin()
+}
+
+func (d *Database) querySettings(opts ...QueryOption) (*QuerySettings, GoquDatabase) {
+	var db GoquDatabase
+
+	querySettings := &QuerySettings{}
+	for _, opt := range opts {
+		opt(querySettings)
+	}
+
+	if querySettings.tx != nil {
+		db = querySettings.tx
+	} else {
+		db = d.goquDB
+	}
+
+	return querySettings, db
+}
+
 // QuerySettings provides configuration for queries, such as including a limit
 // statement, an offset statement, or running the query as part of a transaction.
 type QuerySettings struct {
