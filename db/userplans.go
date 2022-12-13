@@ -8,6 +8,47 @@ import (
 	"github.com/doug-martin/goqu/v9"
 )
 
+// userPlanDS returns the goqu.SelectDataset for getting user plan info, but with
+// out the goqu.Where() calls.
+func userPlanDS(db GoquDatabase) *goqu.SelectDataset {
+	return db.From(t.UserPlans).
+		Select(
+			t.UserPlans.Col("id").As("id"),
+			t.UserPlans.Col("effective_start_date").As("effective_start_date"),
+			t.UserPlans.Col("effective_end_date").As("effective_end_date"),
+			t.UserPlans.Col("created_by").As("created_by"),
+			t.UserPlans.Col("created_at").As("created_at"),
+			t.UserPlans.Col("last_modified_by").As("last_modified_by"),
+			t.UserPlans.Col("last_modified_at").As("last_modified_at"),
+
+			t.Users.Col("id").As(goqu.C("users.id")),
+			t.Users.Col("username").As(goqu.C("users.username")),
+
+			t.Plans.Col("id").As(goqu.C("plans.id")),
+			t.Plans.Col("name").As(goqu.C("plans.name")),
+			t.Plans.Col("description").As(goqu.C("plans.description")),
+		).
+		Join(t.Users, goqu.On(t.UserPlans.Col("user_id").Eq(t.Users.Col("id")))).
+		Join(t.Plans, goqu.On(t.UserPlans.Col("plan_id").Eq(t.Plans.Col("id"))))
+}
+
+func (d *Database) GetUserPlanByID(ctx context.Context, userPlanID string, opts ...QueryOption) (*UserPlan, error) {
+	_, db := d.querySettings(opts...)
+
+	ds := userPlanDS(db).
+		Where(
+			t.UserPlans.Col("id").Eq(userPlanID),
+		).
+		Executor()
+
+	var result UserPlan
+	if err := ds.ScanStructsContext(ctx, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
 // GetActiveUserPlan returns the active user plan for the username passed in.
 // Accepts a variable number of QueryOptions, but only WithTX is currently
 // supported.
@@ -24,25 +65,7 @@ func (d *Database) GetActiveUserPlan(ctx context.Context, username string, opts 
 	effEndDate := goqu.I("user_plans.effective_end_date")
 	currTS := goqu.L("CURRENT_TIMESTAMP")
 
-	query := db.From(t.UserPlans).
-		Select(
-			t.UserPlans.Col("id").As("id"),
-			t.UserPlans.Col("effective_start_date").As("effective_start_date"),
-			t.UserPlans.Col("effective_end_date").As("effective_end_date"),
-			t.UserPlans.Col("created_by").As("created_by"),
-			t.UserPlans.Col("created_at").As("created_at"),
-			t.UserPlans.Col("last_modified_by").As("last_modified_by"),
-			t.UserPlans.Col("last_modified_at").As("last_modified_at"),
-
-			t.Users.Col("id").As(goqu.C("t.Users.id")),
-			t.Users.Col("username").As(goqu.C("t.Users.username")),
-
-			t.Plans.Col("id").As(goqu.C("t.Plans.id")),
-			t.Plans.Col("name").As(goqu.C("t.Plans.name")),
-			t.Plans.Col("description").As(goqu.C("t.Plans.description")),
-		).
-		Join(t.Users, goqu.On(t.UserPlans.Col("user_id").Eq(t.Users.Col("id")))).
-		Join(t.Plans, goqu.On(t.UserPlans.Col("plan_id").Eq(t.Plans.Col("id")))).
+	query := userPlanDS(db).
 		Where(goqu.And(
 			t.Users.Col("username").Eq(username),
 			goqu.Or(

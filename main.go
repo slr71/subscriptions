@@ -166,7 +166,12 @@ func main() {
 	if err = natsClient.Subscribe(qmssubs.UserSummary, a.GetUserSummary); err != nil {
 		log.Fatal(err)
 	}
+
 	if err = natsClient.Subscribe(qmssubs.AddUser, a.AddUserHandler); err != nil {
+		log.Fatal(err)
+	}
+
+	if err = natsClient.Subscribe(qmssubs.GetUserPlan, a.GetUserPlanHandler); err != nil {
 		log.Fatal(err)
 	}
 
