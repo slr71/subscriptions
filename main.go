@@ -142,6 +142,7 @@ func main() {
 	if err = natsClient.Subscribe(qmssubs.GetUserUpdates, a.GetUserUpdatesHandler); err != nil {
 		log.Fatal(err)
 	}
+
 	if err = natsClient.Subscribe(qmssubs.AddUserUpdate, a.AddUserUpdateHandler); err != nil {
 		log.Fatal(err)
 	}
@@ -151,6 +152,7 @@ func main() {
 	if err = natsClient.Subscribe(qmssubs.GetUserUsages, a.GetUsagesHandler); err != nil {
 		log.Fatal(err)
 	}
+
 	if err = natsClient.Subscribe(qmssubs.AddUserUsages, a.AddUsageHandler); err != nil {
 		log.Fatal(err)
 	}
@@ -159,6 +161,7 @@ func main() {
 	if err = natsClient.Subscribe(qmssubs.GetUserOverages, a.GetUserOverages); err != nil {
 		log.Fatal(err)
 	}
+
 	if err = natsClient.Subscribe(qmssubs.CheckUserOverages, a.CheckUserOverages); err != nil {
 		log.Fatal(err)
 	}
@@ -172,6 +175,10 @@ func main() {
 	}
 
 	if err = natsClient.Subscribe(qmssubs.GetUserPlan, a.GetUserPlanHandler); err != nil {
+		log.Fatal(err)
+	}
+
+	if err = natsClient.Subscribe(qmssubs.AddQuota, a.AddQuotaHandler); err != nil {
 		log.Fatal(err)
 	}
 
