@@ -182,6 +182,22 @@ func main() {
 		log.Fatal(err)
 	}
 
+	if err = natsClient.Subscribe(qmssubs.ListPlans, a.ListPlansHandler); err != nil {
+		log.Fatal(err)
+	}
+
+	if err = natsClient.Subscribe(qmssubs.AddPlan, a.AddPlanHandler); err != nil {
+		log.Fatal(err)
+	}
+
+	if err = natsClient.Subscribe(qmssubs.GetPlan, a.GetPlanHandler); err != nil {
+		log.Fatal(err)
+	}
+
+	if err = natsClient.Subscribe(qmssubs.UpsertQuotaDefaults, a.UpsertQuotaDefaultsHandler); err != nil {
+		log.Fatal(err)
+	}
+
 	srv := fmt.Sprintf(":%s", strconv.Itoa(*listenPort))
 	log.Fatal(http.ListenAndServe(srv, nil))
 }

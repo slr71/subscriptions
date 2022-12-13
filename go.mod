@@ -7,10 +7,10 @@ require (
 	github.com/cyverse-de/go-mod/gotelnats v0.0.11
 	github.com/cyverse-de/go-mod/logging v0.0.2
 	github.com/cyverse-de/go-mod/otelutils v0.0.3
-	github.com/cyverse-de/go-mod/pbinit v0.0.13
+	github.com/cyverse-de/go-mod/pbinit v0.0.15
 	github.com/cyverse-de/go-mod/protobufjson v0.0.3
-	github.com/cyverse-de/go-mod/subjects v0.0.5
-	github.com/cyverse-de/p/go/qms v0.0.15
+	github.com/cyverse-de/go-mod/subjects v0.0.6
+	github.com/cyverse-de/p/go/qms v0.0.17
 	github.com/cyverse-de/p/go/svcerror v0.0.5
 	github.com/doug-martin/goqu/v9 v9.18.0
 	github.com/jmoiron/sqlx v1.3.5
