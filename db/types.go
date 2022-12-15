@@ -98,9 +98,10 @@ type UserPlan struct {
 }
 
 type Plan struct {
-	ID          string `db:"id" goqu:"defaultifempty"`
-	Name        string `db:"name"`
-	Description string `db:"description"`
+	ID            string             `db:"id" goqu:"defaultifempty"`
+	Name          string             `db:"name"`
+	Description   string             `db:"description"`
+	QuotaDefaults []PlanQuotaDefault `db:"plan_quota_defaults"`
 }
 
 type PlanQuotaDefault struct {
