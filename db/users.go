@@ -130,12 +130,7 @@ func (d *Database) EnsureUser(ctx context.Context, username string, opts ...Quer
 				Where(goqu.Ex{"username": username}))
 
 	// Log the SQL statement if we're debugging database calls.
-	if d.debug {
-		sql, params, err := statement.ToSQL()
-		if err == nil {
-			log.Warnf("EnsureUser: %s %v", sql, params)
-		}
-	}
+	d.LogSQL(statement)
 
 	// Execute the statement and fetch the result.
 	found, err := statement.Executor().ScanStructContext(ctx, &result)

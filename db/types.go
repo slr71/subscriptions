@@ -33,6 +33,10 @@ type GoquDatabase interface {
 	Update(table interface{}) *goqu.UpdateDataset
 }
 
+type SQLStatement interface {
+	ToSQL() (sql string, params []interface{}, err error)
+}
+
 var CurrentTimestamp = goqu.L("CURRENT_TIMESTAMP")
 
 var UpdateOperationNames = []string{"ADD", "SET"}
