@@ -1,4 +1,6 @@
-all: subscriptions dev-test/dev-test
+all: subscriptions
+
+test-prog: dev-test/dev-test
 
 SOURCES = $(wildcard *.go) $(wildcard */*.go)
 
@@ -11,4 +13,4 @@ dev-test/dev-test: ${SOURCES}
 clean:
 	rm -rf subscriptions dev-test/dev-test
 
-.PHONY: all clean dev-test
+.PHONY: all clean test-prog
