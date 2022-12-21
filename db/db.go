@@ -14,6 +14,7 @@ type Database struct {
 	db     *sqlx.DB
 	fullDB *goqu.Database
 	goquDB GoquDatabase
+	debug  bool
 }
 
 func New(dbconn *sqlx.DB) *Database {
@@ -22,7 +23,7 @@ func New(dbconn *sqlx.DB) *Database {
 		db:     dbconn, // Used when a method needs direct access to sqlx for struct scanning.
 		fullDB: goquDB, // Used when a method needs to use a method not defined in the GoquDatabase interface.
 		goquDB: goquDB, // Used when a method needs to optionally support being run inside a transaction.
-
+		debug:  false,  // Set to true to log SQL statements. TODO: implement for all statements.
 	}
 }
 
