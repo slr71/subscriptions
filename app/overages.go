@@ -3,27 +3,12 @@ package app
 import (
 	"context"
 
-	"github.com/cockroachdb/apd"
 	"github.com/cyverse-de/go-mod/pbinit"
 	"github.com/cyverse-de/p/go/qms"
 	"github.com/cyverse-de/subscriptions/db"
 	"github.com/cyverse-de/subscriptions/errors"
 	"github.com/sirupsen/logrus"
 )
-
-func parseFloat64(floatStr string) (float64, error) {
-	d, _, err := apd.New(0, 0).SetString(floatStr)
-	if err != nil {
-		return 0.0, err
-	}
-
-	f, err := d.Float64()
-	if err != nil {
-		return 0.0, err
-	}
-
-	return f, nil
-}
 
 func (a *App) GetUserOverages(subject, reply string, request *qms.AllUserOveragesRequest) {
 	var err error

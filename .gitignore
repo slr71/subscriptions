@@ -3,3 +3,4 @@ subscriptions
 configs/local.yml
 configs/local.yaml
 **/dotenv
+dev-test/

@@ -15,7 +15,7 @@ import (
 	"github.com/cyverse-de/go-mod/logging"
 	"github.com/cyverse-de/go-mod/otelutils"
 	"github.com/cyverse-de/go-mod/protobufjson"
-	"github.com/cyverse-de/go-mod/subjects"
+	qmssubs "github.com/cyverse-de/go-mod/subjects/qms"
 	"github.com/cyverse-de/subscriptions/app"
 	"github.com/cyverse-de/subscriptions/natscl"
 	"github.com/jmoiron/sqlx"
@@ -139,19 +139,64 @@ func main() {
 
 	a := app.New(natsClient, dbconn, userSuffix)
 
-	natsClient.Subscribe(subjects.QMSGetUserUpdates, a.GetUserUpdatesHandler)
-	natsClient.Subscribe(subjects.QMSAddUserUpdate, a.AddUserUpdateHandler)
+	if err = natsClient.Subscribe(qmssubs.GetUserUpdates, a.GetUserUpdatesHandler); err != nil {
+		log.Fatal(err)
+	}
+
+	if err = natsClient.Subscribe(qmssubs.AddUserUpdate, a.AddUserUpdateHandler); err != nil {
+		log.Fatal(err)
+	}
 
 	// Only call these two endpoints if you need to correct a usage value and
 	// bypass the updates tables.
-	natsClient.Subscribe(subjects.QMSGetUserUsages, a.GetUsagesHandler)
-	natsClient.Subscribe(subjects.QMSAddUserUsages, a.AddUsageHandler)
+	if err = natsClient.Subscribe(qmssubs.GetUserUsages, a.GetUsagesHandler); err != nil {
+		log.Fatal(err)
+	}
+
+	if err = natsClient.Subscribe(qmssubs.AddUserUsages, a.AddUsageHandler); err != nil {
+		log.Fatal(err)
+	}
 
 	// These will get used by frontend calls to check for user overages.
-	natsClient.Subscribe(subjects.QMSGetUserOverages, a.GetUserOverages)
-	natsClient.Subscribe(subjects.QMSCheckUserOverages, a.CheckUserOverages)
+	if err = natsClient.Subscribe(qmssubs.GetUserOverages, a.GetUserOverages); err != nil {
+		log.Fatal(err)
+	}
 
-	natsClient.Subscribe(subjects.QMSUserSummary, a.GetUserSummary)
+	if err = natsClient.Subscribe(qmssubs.CheckUserOverages, a.CheckUserOverages); err != nil {
+		log.Fatal(err)
+	}
+
+	if err = natsClient.Subscribe(qmssubs.UserSummary, a.GetUserSummary); err != nil {
+		log.Fatal(err)
+	}
+
+	if err = natsClient.Subscribe(qmssubs.AddUser, a.AddUserHandler); err != nil {
+		log.Fatal(err)
+	}
+
+	if err = natsClient.Subscribe(qmssubs.GetUserPlan, a.GetUserPlanHandler); err != nil {
+		log.Fatal(err)
+	}
+
+	if err = natsClient.Subscribe(qmssubs.AddQuota, a.AddQuotaHandler); err != nil {
+		log.Fatal(err)
+	}
+
+	if err = natsClient.Subscribe(qmssubs.ListPlans, a.ListPlansHandler); err != nil {
+		log.Fatal(err)
+	}
+
+	if err = natsClient.Subscribe(qmssubs.AddPlan, a.AddPlanHandler); err != nil {
+		log.Fatal(err)
+	}
+
+	if err = natsClient.Subscribe(qmssubs.GetPlan, a.GetPlanHandler); err != nil {
+		log.Fatal(err)
+	}
+
+	if err = natsClient.Subscribe(qmssubs.UpsertQuotaDefaults, a.UpsertQuotaDefaultsHandler); err != nil {
+		log.Fatal(err)
+	}
 
 	srv := fmt.Sprintf(":%s", strconv.Itoa(*listenPort))
 	log.Fatal(http.ListenAndServe(srv, nil))

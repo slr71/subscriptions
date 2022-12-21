@@ -19,16 +19,7 @@ func (d *Database) GetCurrentQuota(ctx context.Context, resourceTypeID, userPlan
 		quotaValue float64
 	)
 
-	querySettings := &QuerySettings{}
-	for _, opt := range opts {
-		opt(querySettings)
-	}
-
-	if querySettings.tx != nil {
-		db = querySettings.tx
-	} else {
-		db = d.goquDB
-	}
+	_, db = d.querySettings(opts...)
 
 	quotasE := db.From("quotas").
 		Select(goqu.C("quota")).
@@ -60,16 +51,7 @@ func (d *Database) UpsertQuota(ctx context.Context, update bool, value float64, 
 		db  GoquDatabase
 	)
 
-	querySettings := &QuerySettings{}
-	for _, opt := range opts {
-		opt(querySettings)
-	}
-
-	if querySettings.tx != nil {
-		db = querySettings.tx
-	} else {
-		db = d.goquDB
-	}
+	_, db = d.querySettings(opts...)
 
 	updateRecord := goqu.Record{
 		"quota":            value,

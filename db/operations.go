@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 
+	t "github.com/cyverse-de/subscriptions/db/tables"
 	"github.com/doug-martin/goqu/v9"
 )
 
@@ -15,19 +16,9 @@ func (d *Database) GetOperationID(ctx context.Context, name string, opts ...Quer
 		db  GoquDatabase
 	)
 
-	querySettings := &QuerySettings{}
-	for _, opt := range opts {
-		opt(querySettings)
-	}
+	_, db = d.querySettings(opts...)
 
-	if querySettings.tx != nil {
-		db = querySettings.tx
-	} else {
-		db = d.goquDB
-	}
-
-	opT := goqu.T("update_operations")
-	query := db.From(opT).
+	query := db.From(t.UpdateOperations).
 		Select("id").
 		Where(goqu.Ex{
 			"name": name,
@@ -53,19 +44,9 @@ func (d *Database) GetOperation(ctx context.Context, id string, opts ...QueryOpt
 		result UpdateOperation
 	)
 
-	querySettings := &QuerySettings{}
-	for _, opt := range opts {
-		opt(querySettings)
-	}
+	_, db = d.querySettings(opts...)
 
-	if querySettings.tx != nil {
-		db = querySettings.tx
-	} else {
-		db = d.goquDB
-	}
-
-	opT := goqu.T("update_operations")
-	query := db.From(opT).
+	query := db.From(t.UpdateOperations).
 		Select("id", "name").
 		Where(goqu.Ex{
 			"id": id,

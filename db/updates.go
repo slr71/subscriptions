@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	t "github.com/cyverse-de/subscriptions/db/tables"
 	"github.com/doug-martin/goqu/v9"
 	"github.com/sirupsen/logrus"
 )
@@ -17,47 +18,33 @@ func (d *Database) UserUpdates(ctx context.Context, username string, opts ...Que
 		db  GoquDatabase
 	)
 
-	querySettings := &QuerySettings{}
-	for _, opt := range opts {
-		opt(querySettings)
-	}
+	querySettings, db := d.querySettings(opts...)
 
-	if querySettings.tx != nil {
-		db = querySettings.tx
-	} else {
-		db = d.goquDB
-	}
-
-	opsT := goqu.T("update_operations")
-	updatesT := goqu.T("updates")
-	usersT := goqu.T("users")
-	rtT := goqu.T("resource_types")
-
-	query := db.From(updatesT).
+	query := db.From(t.Updates).
 		Select(
-			updatesT.Col("id"),
-			updatesT.Col("value_type"),
-			updatesT.Col("value"),
-			updatesT.Col("effective_date"),
-			updatesT.Col("created_by"),
-			updatesT.Col("created_at"),
-			updatesT.Col("last_modified_by"),
-			updatesT.Col("last_modified_at"),
+			t.Updates.Col("id"),
+			t.Updates.Col("value_type"),
+			t.Updates.Col("value"),
+			t.Updates.Col("effective_date"),
+			t.Updates.Col("created_by"),
+			t.Updates.Col("created_at"),
+			t.Updates.Col("last_modified_by"),
+			t.Updates.Col("last_modified_at"),
 
-			usersT.Col("id").As(goqu.C("users.id")),
-			usersT.Col("username").As(goqu.C("users.username")),
+			t.Users.Col("id").As(goqu.C("users.id")),
+			t.Users.Col("username").As(goqu.C("users.username")),
 
-			rtT.Col("id").As(goqu.C("resource_types.id")),
-			rtT.Col("name").As(goqu.C("resource_types.name")),
-			rtT.Col("unit").As(goqu.C("resource_types.unit")),
+			t.RT.Col("id").As(goqu.C("resource_types.id")),
+			t.RT.Col("name").As(goqu.C("resource_types.name")),
+			t.RT.Col("unit").As(goqu.C("resource_types.unit")),
 
-			opsT.Col("id").As(goqu.C("update_operations.id")),
-			opsT.Col("name").As(goqu.C("update_operations.name")),
+			t.UOps.Col("id").As(goqu.C("update_operations.id")),
+			t.UOps.Col("name").As(goqu.C("update_operations.name")),
 		).
-		Join(usersT, goqu.On(goqu.I("updates.user_id").Eq(goqu.I("users.id")))).
-		Join(opsT, goqu.On(goqu.I("updates.update_operation_id").Eq(goqu.I("update_operations.id")))).
-		Join(rtT, goqu.On(goqu.I("updates.resource_type_id").Eq(goqu.I("resource_types.id")))).
-		Where(usersT.Col("username").Eq(username))
+		Join(t.Users, goqu.On(goqu.I("updates.user_id").Eq(goqu.I("users.id")))).
+		Join(t.UOps, goqu.On(goqu.I("updates.update_operation_id").Eq(goqu.I("update_operations.id")))).
+		Join(t.RT, goqu.On(goqu.I("updates.resource_type_id").Eq(goqu.I("resource_types.id")))).
+		Where(t.Users.Col("username").Eq(username))
 
 	if querySettings.hasLimit {
 		query = query.Limit(querySettings.limit)
@@ -103,16 +90,7 @@ func (d *Database) AddUserUpdate(ctx context.Context, update *Update, opts ...Qu
 		db  GoquDatabase
 	)
 
-	querySettings := &QuerySettings{}
-	for _, opt := range opts {
-		opt(querySettings)
-	}
-
-	if querySettings.tx != nil {
-		db = querySettings.tx
-	} else {
-		db = d.goquDB
-	}
+	_, db = d.querySettings(opts...)
 
 	ds := db.Insert("updates").Rows(
 		goqu.Record{
