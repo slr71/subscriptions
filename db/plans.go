@@ -9,26 +9,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-// func planDS(db GoquDatabase) *goqu.SelectDataset {
-// 	return db.From(t.Plans).
-// 		Select(
-// 			t.Plans.Col("id"),
-// 			t.Plans.Col("name"),
-// 			t.Plans.Col("description"),
-
-// 			t.PQD.Col("id").As(goqu.C("plan_quota_defaults.id")),
-// 			t.PQD.Col("plan_id").As(goqu.C("plan_quota_defaults.plan_id")),
-// 			t.PQD.Col("quota_value").As(goqu.C("plan_quota_defaults.quota_value")),
-// 			t.PQD.Col("resource_type_id").As(goqu.C("plan_quota_defaults.resource_type_id")),
-
-// 			t.RT.Col("id").As(goqu.C("resource_types.id")),
-// 			t.RT.Col("name").As(goqu.C("resource_types.name")),
-// 			t.RT.Col("unit").As(goqu.C("resource_types.unit")),
-// 		).
-// 		Join(t.PQD, goqu.On(t.PQD.Col("plan_id").Eq(t.Plans.Col("id")))).
-// 		Join(t.RT, goqu.On(t.PQD.Col("resource_type_id").Eq(t.RT.Col("id"))))
-// }
-
 func planDetailsDS(db GoquDatabase, planID string) *goqu.SelectDataset {
 	return db.From(t.PQD).
 		Select(
