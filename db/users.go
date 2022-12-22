@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/doug-martin/goqu/v9"
+	"github.com/pkg/errors"
 )
 
 // GetUserID returns a user's UUID associated with their username.
@@ -100,4 +101,45 @@ func (d *Database) AddUser(ctx context.Context, username string, opts ...QueryOp
 	}
 
 	return id, nil
+}
+
+// EnsureUser ensures that a user with the given username exists in the database then returns the user information.
+// This function accepts a variable number of QueryOptions, but only WithTX is currently supported.
+func (d *Database) EnsureUser(ctx context.Context, username string, opts ...QueryOption) (*User, error) {
+	var (
+		wrapMsg string = "unable to ensure that the user exists in the database"
+		err     error
+		db      GoquDatabase
+		result  User
+	)
+
+	// Prepare to execute the statement.
+	_, db = d.querySettings(opts...)
+
+	// Build the statement.
+	usersT := goqu.T("users")
+	statement := db.From("ins").
+		With("ins",
+			db.Insert(usersT).
+				Returning("id", "username").
+				Rows(goqu.Record{"username": username}).
+				OnConflict(goqu.DoNothing())).
+		UnionAll(
+			db.From(usersT).
+				Select("id", "username").
+				Where(goqu.Ex{"username": username}))
+
+	// Log the SQL statement if we're debugging database calls.
+	d.LogSQL(statement)
+
+	// Execute the statement and fetch the result.
+	found, err := statement.Executor().ScanStructContext(ctx, &result)
+	if err != nil {
+		return nil, errors.Wrap(err, wrapMsg)
+	}
+	if !found {
+		return nil, nil
+	}
+
+	return &result, nil
 }

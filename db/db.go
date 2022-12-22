@@ -14,6 +14,7 @@ type Database struct {
 	db     *sqlx.DB
 	fullDB *goqu.Database
 	goquDB GoquDatabase
+	logSQL bool
 }
 
 func New(dbconn *sqlx.DB) *Database {
@@ -22,7 +23,24 @@ func New(dbconn *sqlx.DB) *Database {
 		db:     dbconn, // Used when a method needs direct access to sqlx for struct scanning.
 		fullDB: goquDB, // Used when a method needs to use a method not defined in the GoquDatabase interface.
 		goquDB: goquDB, // Used when a method needs to optionally support being run inside a transaction.
+		logSQL: false,  // Set to true to log SQL statements. TODO: implement for all statements.
+	}
+}
 
+// EnableSQLLogging enables SQL logging for the database instance.
+func (d *Database) EnableSQLLogging() {
+	d.logSQL = true
+}
+
+// LogSQL logs an SQL statement that is being executed if debugging is enabled.
+func (d *Database) LogSQL(statement SQLStatement) {
+	if d.logSQL {
+		sql, args, err := statement.ToSQL()
+		if err != nil {
+			log.Errorf("unable to generate the SQL: %s", err)
+			return
+		}
+		log.Infof("%s %v", sql, args)
 	}
 }
 
