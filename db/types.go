@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/cyverse-de/p/go/qms"
 	"github.com/doug-martin/goqu/v9"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type GoquDatabase interface {
@@ -56,10 +58,25 @@ type User struct {
 	Username string `db:"username"`
 }
 
+func (u User) ToQMSUser() *qms.QMSUser {
+	return &qms.QMSUser{
+		Uuid:     u.ID,
+		Username: u.Username,
+	}
+}
+
 type ResourceType struct {
 	ID   string `db:"id" goqu:"defaultifempty"`
 	Name string `db:"name"`
 	Unit string `db:"unit"`
+}
+
+func (rt ResourceType) ToQMSResourceType() *qms.ResourceType {
+	return &qms.ResourceType{
+		Uuid: rt.ID,
+		Name: rt.Name,
+		Unit: rt.Unit,
+	}
 }
 
 var ResourceTypeNames = []string{
@@ -97,10 +114,36 @@ type UserPlan struct {
 	EffectiveEndDate   time.Time `db:"effective_end_date"`
 	User               User      `db:"users"`
 	Plan               Plan      `db:"plans"`
+	Quotas             []Quota   `db:"-"`
+	Usages             []Usage   `db:"-"`
 	CreatedBy          string    `db:"created_by"`
 	CreatedAt          time.Time `db:"created_at" goqu:"defaultifempty"`
 	LastModifiedBy     string    `db:"last_modified_by"`
 	LastModifiedAt     string    `db:"last_modified_at" goqu:"defaultifempty"`
+}
+
+func (up UserPlan) ToQMSUserPlan() *qms.UserPlan {
+	// Convert the list of quotas.
+	quotas := make([]*qms.Quota, len(up.Quotas))
+	for i, quota := range up.Quotas {
+		quotas[i] = quota.ToQMSQuota()
+	}
+
+	// Convert th elist of usages.
+	usages := make([]*qms.Usage, len(up.Usages))
+	for i, usage := range up.Usages {
+		usages[i] = usage.ToQMSUsage()
+	}
+
+	return &qms.UserPlan{
+		Uuid:               up.ID,
+		EffectiveStartDate: timestamppb.New(up.EffectiveStartDate),
+		EffectiveEndDate:   timestamppb.New(up.EffectiveEndDate),
+		User:               up.User.ToQMSUser(),
+		Plan:               up.Plan.ToQMSPlan(),
+		Quotas:             quotas,
+		Usages:             usages,
+	}
 }
 
 type Plan struct {
@@ -110,11 +153,34 @@ type Plan struct {
 	QuotaDefaults []PlanQuotaDefault `db:"-"`
 }
 
+func (p Plan) ToQMSPlan() *qms.Plan {
+	// Convert the quota defaults.
+	quotaDefaults := make([]*qms.QuotaDefault, len(p.QuotaDefaults))
+	for i, quotaDefault := range p.QuotaDefaults {
+		quotaDefaults[i] = quotaDefault.ToQMSQuotaDefault()
+	}
+
+	return &qms.Plan{
+		Uuid:              p.ID,
+		Name:              p.Name,
+		Description:       p.Description,
+		PlanQuotaDefaults: quotaDefaults,
+	}
+}
+
 type PlanQuotaDefault struct {
 	ID           string       `db:"id" goqu:"defaultifempty"`
 	PlanID       string       `db:"plan_id"`
 	QuotaValue   float64      `db:"quota_value"`
 	ResourceType ResourceType `db:"resource_types"`
+}
+
+func (pqd PlanQuotaDefault) ToQMSQuotaDefault() *qms.QuotaDefault {
+	return &qms.QuotaDefault{
+		Uuid:         pqd.ID,
+		QuotaValue:   float32(pqd.QuotaValue),
+		ResourceType: pqd.ResourceType.ToQMSResourceType(),
+	}
 }
 
 type Usage struct {
@@ -128,6 +194,18 @@ type Usage struct {
 	LastModifiedAt time.Time    `db:"last_modified_at"`
 }
 
+func (u Usage) ToQMSUsage() *qms.Usage {
+	return &qms.Usage{
+		Uuid:           u.ID,
+		Usage:          u.Usage,
+		ResourceType:   u.ResourceType.ToQMSResourceType(),
+		CreatedBy:      u.CreatedBy,
+		CreatedAt:      timestamppb.New(u.CreatedAt),
+		LastModifiedBy: u.LastModifiedBy,
+		LastModifiedAt: timestamppb.New(u.LastModifiedAt),
+	}
+}
+
 type Quota struct {
 	ID             string       `db:"id" goqu:"defaultifempty"`
 	Quota          float64      `db:"quota"`
@@ -137,6 +215,18 @@ type Quota struct {
 	CreatedAt      time.Time    `db:"created_at"`
 	LastModifiedBy string       `db:"last_modified_by"`
 	LastModifiedAt time.Time    `db:"last_modified_at"`
+}
+
+func (q Quota) ToQMSQuota() *qms.Quota {
+	return &qms.Quota{
+		Uuid:           q.ID,
+		Quota:          float32(q.Quota),
+		ResourceType:   q.ResourceType.ToQMSResourceType(),
+		CreatedBy:      q.CreatedBy,
+		CreatedAt:      timestamppb.New(q.CreatedAt),
+		LastModifiedBy: q.LastModifiedBy,
+		LastModifiedAt: timestamppb.New(q.LastModifiedAt),
+	}
 }
 
 type Overage struct {
