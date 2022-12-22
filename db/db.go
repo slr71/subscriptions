@@ -37,7 +37,7 @@ func (d *Database) LogSQL(statement SQLStatement) {
 	if d.logSQL {
 		sql, args, err := statement.ToSQL()
 		if err != nil {
-			log.Error("unable to generate the SQL: %s", err)
+			log.Errorf("unable to generate the SQL: %s", err)
 			return
 		}
 		log.Infof("%s %v", sql, args)
