@@ -5,5 +5,5 @@ import (
 )
 
 func (a *App) GetUserPlanHandler(subject, reply string, request *qms.RequestByUsername) {
-	a.GetUserSummary(subject, reply, request)
+	a.GetUserSummaryHandler(subject, reply, request)
 }

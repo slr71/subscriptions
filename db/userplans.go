@@ -42,8 +42,12 @@ func (d *Database) GetUserPlanByID(ctx context.Context, userPlanID string, opts 
 	d.LogSQL(ds)
 
 	var result UserPlan
-	if err := ds.Executor().ScanStructsContext(ctx, &result); err != nil {
+	found, err := ds.Executor().ScanStructContext(ctx, &result)
+	if err != nil {
 		return nil, err
+	}
+	if !found {
+		return nil, nil
 	}
 
 	return &result, nil
@@ -263,7 +267,7 @@ func (d *Database) UserPlanQuotas(ctx context.Context, userPlanID string, opts .
 			t.RT.Col("name").As(goqu.C("resource_types.name")),
 			t.RT.Col("unit").As(goqu.C("resource_types.unit")),
 		).
-		Join(t.RT, goqu.On(goqu.I("t.Quotas.resource_type_id").Eq(goqu.I("resource_types.id")))).
+		Join(t.RT, goqu.On(goqu.I("quotas.resource_type_id").Eq(goqu.I("resource_types.id")))).
 		Where(t.Quotas.Col("user_plan_id").Eq(userPlanID))
 	d.LogSQL(quotasQuery)
 
