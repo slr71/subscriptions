@@ -107,7 +107,7 @@ func (d *Database) SetActiveUserPlan(ctx context.Context, userID, planID string,
 	d.LogSQL(query)
 
 	var userPlanID string
-	if err := query.Executor().ScanValsContext(ctx, &userPlanID); err != nil {
+	if _, err := query.Executor().ScanValContext(ctx, &userPlanID); err != nil {
 		return "", err
 	}
 
@@ -121,7 +121,7 @@ func (d *Database) SetActiveUserPlan(ctx context.Context, userID, planID string,
 			"last_modified_by",
 		).
 		FromQuery(
-			db.From(t.PQD).
+			goqu.From(t.PQD).
 				Select(
 					t.PQD.Col("resource_type_id"),
 					goqu.V(userPlanID).As("user_plan_id"),
