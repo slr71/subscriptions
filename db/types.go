@@ -44,6 +44,8 @@ var UpdateOperationNames = []string{"ADD", "SET"}
 const UsagesTrackedMetric = "usages"
 const QuotasTrackedMetric = "quotas"
 
+const DefaultPlanName = "Basic"
+
 type UpdateOperation struct {
 	ID   string `db:"id" goqu:"defaultifempty"`
 	Name string `db:"name"`
@@ -105,7 +107,7 @@ type Plan struct {
 	ID            string             `db:"id" goqu:"defaultifempty"`
 	Name          string             `db:"name"`
 	Description   string             `db:"description"`
-	QuotaDefaults []PlanQuotaDefault `db:"plan_quota_defaults"`
+	QuotaDefaults []PlanQuotaDefault `db:"-"`
 }
 
 type PlanQuotaDefault struct {
