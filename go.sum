@@ -44,6 +44,8 @@ github.com/cyverse-de/p/go/analysis v0.0.13 h1:65hbQSnj1sDJcUnDJwMto/ncBxO6PSsWM
 github.com/cyverse-de/p/go/analysis v0.0.13/go.mod h1:zI19t8ygFWsXKmcIb6cLAgiPRR+fHHT716hFNPbGDOc=
 github.com/cyverse-de/p/go/header v0.0.1 h1:YgI0DLIOvL6m0LF22tFUk3OHLtW5NCuNiaGqwkxv64s=
 github.com/cyverse-de/p/go/header v0.0.1/go.mod h1:VHHZzBOwFQLfIrfIjK1FJlaKy00m4CFGufx4LhVXd8Q=
+github.com/cyverse-de/p/go/header v0.0.3 h1:d0IBiG7nDrFxvetSnxL0tB2j7yIgumvYaRkoUg/uA9Q=
+github.com/cyverse-de/p/go/header v0.0.3/go.mod h1:zGaCg//IpJ2f6P4jRAjEYPoFgokgtELI6+aojhG2eNw=
 github.com/cyverse-de/p/go/monitoring v0.0.2 h1:oI/zt2a7k66JOKs9z+3QT7EzRYbPee+mgLD6DG+nj8w=
 github.com/cyverse-de/p/go/monitoring v0.0.2/go.mod h1:UzSOg02RZ3GEm8iuQu39Hbo8rnYDfZ5XzZnN8UQYCyY=
 github.com/cyverse-de/p/go/qms v0.0.13 h1:rXeznPzAgTO8X2VCo66uvwXz0YEuAuWAtivQDbbnZr4=
@@ -56,8 +58,12 @@ github.com/cyverse-de/p/go/qms v0.0.16 h1:e2tqbDYRPzTDKogZO+VTwoXohEJUZLtCtxcEQp
 github.com/cyverse-de/p/go/qms v0.0.16/go.mod h1:2zWzMlzjUeGWErAuovBkfD39rPFrqsbKOjl8tUy36I4=
 github.com/cyverse-de/p/go/qms v0.0.17 h1:OA6m21ciPah3MEcBGplqREUh0cnjnYV0Pr6e/8ztUmA=
 github.com/cyverse-de/p/go/qms v0.0.17/go.mod h1:2zWzMlzjUeGWErAuovBkfD39rPFrqsbKOjl8tUy36I4=
+github.com/cyverse-de/p/go/qms v0.0.19 h1:CkYr/M3vgOiZbCD1zhXPnAZn+911Btqbl1YPKXoIU3Y=
+github.com/cyverse-de/p/go/qms v0.0.19/go.mod h1:2zWzMlzjUeGWErAuovBkfD39rPFrqsbKOjl8tUy36I4=
 github.com/cyverse-de/p/go/svcerror v0.0.5 h1:WbUcU4VjbNU0agfrHJOCy9orAY72WJWo92b1vR3+3sw=
 github.com/cyverse-de/p/go/svcerror v0.0.5/go.mod h1:WCGIrhW0KXtSu86YhjU/JXG8LrZs5wJPBCH4wvnFYcQ=
+github.com/cyverse-de/p/go/svcerror v0.0.7 h1:PScx8ctSBtnkER6ypgWsuxe8p3/jgfh6t/Dy5J9tg48=
+github.com/cyverse-de/p/go/svcerror v0.0.7/go.mod h1:8rTmVk7xKLCbXSG4CLxlwQ10mc5tV3vdp4P4BjXPvyE=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
