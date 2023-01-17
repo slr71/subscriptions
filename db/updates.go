@@ -134,14 +134,14 @@ func (d *Database) ProcessUpdateForUsage(ctx context.Context, update *Update) er
 
 	if err = tx.Wrap(func() error {
 		log.Debug("before getting active user plan")
-		userPlan, err := d.GetActiveUserPlan(ctx, update.User.Username, WithTX(tx))
+		subscription, err := d.GetActiveSubscription(ctx, update.User.Username, WithTX(tx))
 		if err != nil {
 			return err
 		}
-		log.Debugf("after getting active user plan %s", userPlan.ID)
+		log.Debugf("after getting active user plan %s", subscription.ID)
 
 		log.Debug("getting current usage")
-		usageValue, usageFound, err := d.GetCurrentUsage(ctx, update.ResourceType.ID, userPlan.ID, WithTX(tx))
+		usageValue, usageFound, err := d.GetCurrentUsage(ctx, update.ResourceType.ID, subscription.ID, WithTX(tx))
 		if err != nil {
 			return err
 		}
@@ -159,7 +159,7 @@ func (d *Database) ProcessUpdateForUsage(ctx context.Context, update *Update) er
 		log.Debugf("new usage value is %f", usageValue)
 
 		log.Debug("upserting new usage value")
-		if err = d.UpsertUsage(ctx, usageFound, usageValue, update.ResourceType.ID, userPlan.ID, WithTX(tx)); err != nil {
+		if err = d.UpsertUsage(ctx, usageFound, usageValue, update.ResourceType.ID, subscription.ID, WithTX(tx)); err != nil {
 			return err
 		}
 		log.Debug("done upserting new value")
@@ -187,12 +187,12 @@ func (d *Database) ProcessUpdateForQuota(ctx context.Context, update *Update, op
 	}
 
 	if err = tx.Wrap(func() error {
-		userPlan, err := d.GetActiveUserPlan(ctx, update.User.Username, WithTX(tx))
+		subscription, err := d.GetActiveSubscription(ctx, update.User.Username, WithTX(tx))
 		if err != nil {
 			return err
 		}
 
-		quotaValue, quotaFound, err := d.GetCurrentQuota(ctx, update.ResourceType.ID, userPlan.ID, WithTX(tx))
+		quotaValue, quotaFound, err := d.GetCurrentQuota(ctx, update.ResourceType.ID, subscription.ID, WithTX(tx))
 		if err != nil {
 			return err
 		}
@@ -211,7 +211,7 @@ func (d *Database) ProcessUpdateForQuota(ctx context.Context, update *Update, op
 			quotaFound,
 			quotaValue,
 			update.ResourceType.ID,
-			userPlan.ID,
+			subscription.ID,
 			WithTX(tx),
 		); err != nil {
 			return err

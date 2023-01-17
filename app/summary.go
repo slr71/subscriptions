@@ -11,7 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (a *App) GetUserSummary(ctx context.Context, username string) (*qms.UserPlan, error) {
+func (a *App) GetUserSummary(ctx context.Context, username string) (*qms.Subscription, error) {
 	// Set up the log context.
 	log := log.WithFields(
 		logrus.Fields{
@@ -23,21 +23,21 @@ func (a *App) GetUserSummary(ctx context.Context, username string) (*qms.UserPla
 	// Get the user summary.
 	d := db.New(a.db)
 
-	var userPlan *db.UserPlan
+	var subscription *db.Subscription
 	tx, err := d.Begin()
 	if err != nil {
 		return nil, err
 	}
 	err = tx.Wrap(func() error {
 		log.Debug("before getting the active user plan")
-		userPlan, err = d.GetActiveUserPlan(ctx, username, db.WithTX(tx))
+		subscription, err = d.GetActiveSubscription(ctx, username, db.WithTX(tx))
 		if err != nil {
 			log.Errorf("unable to get the active user plan: %s", err)
 			return err
 		}
 		log.Debug("after getting the active user plan")
 
-		if userPlan == nil || userPlan.ID == "" {
+		if subscription == nil || subscription.ID == "" {
 			user, err := d.EnsureUser(ctx, username, db.WithTX(tx))
 			if err != nil {
 				log.Errorf("unable to ensure that the user exists in the database: %s", err)
@@ -50,18 +50,18 @@ func (a *App) GetUserSummary(ctx context.Context, username string) (*qms.UserPla
 				return err
 			}
 
-			userPlanID, err := d.SetActiveUserPlan(ctx, user.ID, plan.ID, db.WithTX(tx))
+			subscriptionID, err := d.SetActiveSubscription(ctx, user.ID, plan.ID, db.WithTX(tx))
 			if err != nil {
 				log.Errorf("unable to subscribe the user to the default plan: %s", err)
 				return err
 			}
 
-			userPlan, err = d.GetUserPlanByID(ctx, userPlanID, db.WithTX(tx))
+			subscription, err = d.GetSubscriptionByID(ctx, subscriptionID, db.WithTX(tx))
 			if err != nil {
 				log.Errorf("unable to look up the new user plan: %s", err)
 				return err
 			}
-			if userPlan == nil {
+			if subscription == nil {
 				err = fmt.Errorf("the newly inserted user plan could not be found")
 				log.Error(err)
 				return err
@@ -69,7 +69,7 @@ func (a *App) GetUserSummary(ctx context.Context, username string) (*qms.UserPla
 		}
 
 		log.Debug("before getting the user plan details")
-		err = d.LoadUserPlanDetails(ctx, userPlan, db.WithTX(tx))
+		err = d.LoadSubscriptionDetails(ctx, subscription, db.WithTX(tx))
 		if err != nil {
 			return err
 		}
@@ -81,7 +81,7 @@ func (a *App) GetUserSummary(ctx context.Context, username string) (*qms.UserPla
 		return nil, err
 	}
 
-	return userPlan.ToQMSUserPlan(), nil
+	return subscription.ToQMSSubscription(), nil
 }
 
 func (a *App) GetUserSummaryHandler(subject, reply string, request *qms.RequestByUsername) {
@@ -89,12 +89,12 @@ func (a *App) GetUserSummaryHandler(subject, reply string, request *qms.RequestB
 
 	log := log.WithFields(logrus.Fields{"context": "user summary"})
 
-	response := pbinit.NewUserPlanResponse()
+	response := pbinit.NewSubscriptionResponse()
 
 	ctx, span := pbinit.InitQMSRequestByUsername(request, subject)
 	defer span.End()
 
-	sendError := func(ctx context.Context, response *qms.UserPlanResponse, err error) {
+	sendError := func(ctx context.Context, response *qms.SubscriptionResponse, err error) {
 		log.Error(err)
 		response.Error = errors.NatsError(ctx, err)
 		if err = a.client.Respond(ctx, reply, response); err != nil {
@@ -110,13 +110,13 @@ func (a *App) GetUserSummaryHandler(subject, reply string, request *qms.RequestB
 
 	log = log.WithFields(logrus.Fields{"user": username})
 
-	userPlan, err := a.GetUserSummary(ctx, username)
+	subscription, err := a.GetUserSummary(ctx, username)
 	if err != nil {
 		sendError(ctx, response, err)
 		return
 	}
 
-	response.UserPlan = userPlan
+	response.Subscription = subscription
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}

@@ -13,7 +13,7 @@ import (
 // Also returns whether or not the usage was actually found or the default value
 // was returned. Accepts a variable number of QueryOptions, though only WithTX
 // is currently supported.
-func (d *Database) GetCurrentUsage(ctx context.Context, resourceTypeID, userPlanID string, opts ...QueryOption) (float64, bool, error) {
+func (d *Database) GetCurrentUsage(ctx context.Context, resourceTypeID, subscriptionID string, opts ...QueryOption) (float64, bool, error) {
 	var (
 		err error
 		db  GoquDatabase
@@ -25,7 +25,7 @@ func (d *Database) GetCurrentUsage(ctx context.Context, resourceTypeID, userPlan
 		Select(goqu.C("usage")).
 		Where(goqu.And(
 			goqu.I("resource_type_id").Eq(resourceTypeID),
-			goqu.I("user_plan_id").Eq(userPlanID),
+			goqu.I("subscription_id").Eq(subscriptionID),
 		)).
 		Limit(1).
 		Executor()
@@ -42,7 +42,7 @@ func (d *Database) GetCurrentUsage(ctx context.Context, resourceTypeID, userPlan
 // UpsertUsage will insert or update a record usage in the database for the
 // resource type and user plan indicated. Accepts a variable number of
 // QueryOptions, though only WithTX is currently supported.
-func (d *Database) UpsertUsage(ctx context.Context, update bool, value float64, resourceTypeID, userPlanID string, opts ...QueryOption) error {
+func (d *Database) UpsertUsage(ctx context.Context, update bool, value float64, resourceTypeID, subscriptionID string, opts ...QueryOption) error {
 	var (
 		err error
 		db  GoquDatabase
@@ -53,7 +53,7 @@ func (d *Database) UpsertUsage(ctx context.Context, update bool, value float64, 
 	updateRecord := goqu.Record{
 		"usage":            value,
 		"resource_type_id": resourceTypeID,
-		"user_plan_id":     userPlanID,
+		"subscription_id":  subscriptionID,
 		"last_modified_by": "de",
 		"created_by":       "de",
 	}
@@ -65,7 +65,7 @@ func (d *Database) UpsertUsage(ctx context.Context, update bool, value float64, 
 		upsertE = db.Update("usages").Set(updateRecord).Where(
 			goqu.And(
 				goqu.I("resource_type_id").Eq(resourceTypeID),
-				goqu.I("user_plan_id").Eq(userPlanID),
+				goqu.I("subscription_id").Eq(subscriptionID),
 			),
 		).Executor()
 	}
@@ -90,7 +90,7 @@ func (d *Database) CalculateUsage(ctx context.Context, updateType string, usage 
 		newUsageValue float64
 	)
 
-	currentUsageValue, doUpdate, err := d.GetCurrentUsage(ctx, usage.ResourceType.ID, usage.UserPlanID, opts...)
+	currentUsageValue, doUpdate, err := d.GetCurrentUsage(ctx, usage.ResourceType.ID, usage.SubscriptionID, opts...)
 	if err != nil {
 		return err
 	}
@@ -107,7 +107,7 @@ func (d *Database) CalculateUsage(ctx context.Context, updateType string, usage 
 
 	usage.Usage = newUsageValue
 
-	if err = d.UpsertUsage(ctx, doUpdate, newUsageValue, usage.ResourceType.ID, usage.UserPlanID, opts...); err != nil {
+	if err = d.UpsertUsage(ctx, doUpdate, newUsageValue, usage.ResourceType.ID, usage.SubscriptionID, opts...); err != nil {
 		return err
 	}
 

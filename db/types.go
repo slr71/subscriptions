@@ -108,7 +108,7 @@ type Update struct {
 	UpdateOperation UpdateOperation `db:"update_operations"`
 }
 
-type UserPlan struct {
+type Subscription struct {
 	ID                 string    `db:"id" goqu:"defaultifempty"`
 	EffectiveStartDate time.Time `db:"effective_start_date"`
 	EffectiveEndDate   time.Time `db:"effective_end_date"`
@@ -122,7 +122,7 @@ type UserPlan struct {
 	LastModifiedAt     string    `db:"last_modified_at" goqu:"defaultifempty"`
 }
 
-func (up UserPlan) ToQMSUserPlan() *qms.UserPlan {
+func (up Subscription) ToQMSSubscription() *qms.Subscription {
 	// Convert the list of quotas.
 	quotas := make([]*qms.Quota, len(up.Quotas))
 	for i, quota := range up.Quotas {
@@ -135,7 +135,7 @@ func (up UserPlan) ToQMSUserPlan() *qms.UserPlan {
 		usages[i] = usage.ToQMSUsage()
 	}
 
-	return &qms.UserPlan{
+	return &qms.Subscription{
 		Uuid:               up.ID,
 		EffectiveStartDate: timestamppb.New(up.EffectiveStartDate),
 		EffectiveEndDate:   timestamppb.New(up.EffectiveEndDate),
@@ -186,7 +186,7 @@ func (pqd PlanQuotaDefault) ToQMSQuotaDefault() *qms.QuotaDefault {
 type Usage struct {
 	ID             string       `db:"id" goqu:"defaultifempty"`
 	Usage          float64      `db:"usage"`
-	UserPlanID     string       `db:"user_plan_id"`
+	SubscriptionID string       `db:"subscription_id"`
 	ResourceType   ResourceType `db:"resource_types"`
 	CreatedBy      string       `db:"created_by"`
 	CreatedAt      time.Time    `db:"created_at"`
@@ -210,7 +210,7 @@ type Quota struct {
 	ID             string       `db:"id" goqu:"defaultifempty"`
 	Quota          float64      `db:"quota"`
 	ResourceType   ResourceType `db:"resource_types"`
-	UserPlan       UserPlan     `db:"user_plans"`
+	Subscription   Subscription `db:"subscriptions"`
 	CreatedBy      string       `db:"created_by"`
 	CreatedAt      time.Time    `db:"created_at"`
 	LastModifiedBy string       `db:"last_modified_by"`
@@ -230,10 +230,10 @@ func (q Quota) ToQMSQuota() *qms.Quota {
 }
 
 type Overage struct {
-	UserPlanID   string       `db:"user_plan_id"`
-	User         User         `db:"users"`
-	Plan         Plan         `db:"plans"`
-	ResourceType ResourceType `db:"resource_types"`
-	QuotaValue   float64      `db:"quota_value"`
-	UsageValue   float64      `db:"usage_value"`
+	SubscriptionID string       `db:"subscription_id"`
+	User           User         `db:"users"`
+	Plan           Plan         `db:"plans"`
+	ResourceType   ResourceType `db:"resource_types"`
+	QuotaValue     float64      `db:"quota_value"`
+	UsageValue     float64      `db:"usage_value"`
 }
