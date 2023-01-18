@@ -6,7 +6,7 @@ var (
 	UpdateOperations  = goqu.T("update_operations")
 	UOps              = UpdateOperations
 	Users             = goqu.T("users")
-	UserPlans         = goqu.T("user_plans")
+	Subscriptions     = goqu.T("subscriptions")
 	Plans             = goqu.T("plans")
 	PlanQuotaDefaults = goqu.T("plan_quota_defaults")
 	PQD               = PlanQuotaDefaults

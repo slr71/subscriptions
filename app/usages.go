@@ -37,13 +37,13 @@ func (a *App) GetUsagesHandler(subject, reply string, request *qms.GetUsages) {
 
 	d := db.New(a.db)
 
-	userPlan, err := d.GetActiveUserPlan(ctx, username)
+	subscription, err := d.GetActiveSubscription(ctx, username)
 	if err != nil {
 		sendError(ctx, response, err)
 		return
 	}
 
-	usages, err := d.UserPlanUsages(ctx, userPlan.ID)
+	usages, err := d.SubscriptionUsages(ctx, subscription.ID)
 	if err != nil {
 		sendError(ctx, response, err)
 		return
@@ -51,9 +51,9 @@ func (a *App) GetUsagesHandler(subject, reply string, request *qms.GetUsages) {
 
 	for _, usage := range usages {
 		response.Usages = append(response.Usages, &qms.Usage{
-			Uuid:       usage.ID,
-			Usage:      usage.Usage,
-			UserPlanId: userPlan.ID,
+			Uuid:           usage.ID,
+			Usage:          usage.Usage,
+			SubscriptionId: subscription.ID,
 			ResourceType: &qms.ResourceType{
 				Uuid: usage.ResourceType.ID,
 				Name: usage.ResourceType.Name,
@@ -103,7 +103,7 @@ func (a *App) AddUsageHandler(subject, reply string, request *qms.AddUsage) {
 
 	d := db.New(a.db)
 
-	userPlan, err := d.GetActiveUserPlan(ctx, username)
+	subscription, err := d.GetActiveSubscription(ctx, username)
 	if err != nil {
 		sendError(ctx, response, err)
 		return
@@ -122,8 +122,8 @@ func (a *App) AddUsageHandler(subject, reply string, request *qms.AddUsage) {
 	}
 
 	usage = db.Usage{
-		Usage:      request.UsageValue,
-		UserPlanID: userPlan.ID,
+		Usage:          request.UsageValue,
+		SubscriptionID: subscription.ID,
 		ResourceType: db.ResourceType{
 			ID:   resourceID,
 			Name: request.ResourceName,

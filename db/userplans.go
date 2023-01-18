@@ -8,18 +8,18 @@ import (
 	"github.com/doug-martin/goqu/v9"
 )
 
-// userPlanDS returns the goqu.SelectDataset for getting user plan info, but with
+// subscriptionDS returns the goqu.SelectDataset for getting user plan info, but with
 // out the goqu.Where() calls.
-func userPlanDS(db GoquDatabase) *goqu.SelectDataset {
-	return db.From(t.UserPlans).
+func subscriptionDS(db GoquDatabase) *goqu.SelectDataset {
+	return db.From(t.Subscriptions).
 		Select(
-			t.UserPlans.Col("id").As("id"),
-			t.UserPlans.Col("effective_start_date").As("effective_start_date"),
-			t.UserPlans.Col("effective_end_date").As("effective_end_date"),
-			t.UserPlans.Col("created_by").As("created_by"),
-			t.UserPlans.Col("created_at").As("created_at"),
-			t.UserPlans.Col("last_modified_by").As("last_modified_by"),
-			t.UserPlans.Col("last_modified_at").As("last_modified_at"),
+			t.Subscriptions.Col("id").As("id"),
+			t.Subscriptions.Col("effective_start_date").As("effective_start_date"),
+			t.Subscriptions.Col("effective_end_date").As("effective_end_date"),
+			t.Subscriptions.Col("created_by").As("created_by"),
+			t.Subscriptions.Col("created_at").As("created_at"),
+			t.Subscriptions.Col("last_modified_by").As("last_modified_by"),
+			t.Subscriptions.Col("last_modified_at").As("last_modified_at"),
 
 			t.Users.Col("id").As(goqu.C("users.id")),
 			t.Users.Col("username").As(goqu.C("users.username")),
@@ -28,20 +28,20 @@ func userPlanDS(db GoquDatabase) *goqu.SelectDataset {
 			t.Plans.Col("name").As(goqu.C("plans.name")),
 			t.Plans.Col("description").As(goqu.C("plans.description")),
 		).
-		Join(t.Users, goqu.On(t.UserPlans.Col("user_id").Eq(t.Users.Col("id")))).
-		Join(t.Plans, goqu.On(t.UserPlans.Col("plan_id").Eq(t.Plans.Col("id"))))
+		Join(t.Users, goqu.On(t.Subscriptions.Col("user_id").Eq(t.Users.Col("id")))).
+		Join(t.Plans, goqu.On(t.Subscriptions.Col("plan_id").Eq(t.Plans.Col("id"))))
 }
 
-func (d *Database) GetUserPlanByID(ctx context.Context, userPlanID string, opts ...QueryOption) (*UserPlan, error) {
+func (d *Database) GetSubscriptionByID(ctx context.Context, subscriptionID string, opts ...QueryOption) (*Subscription, error) {
 	_, db := d.querySettings(opts...)
 
-	ds := userPlanDS(db).
+	ds := subscriptionDS(db).
 		Where(
-			t.UserPlans.Col("id").Eq(userPlanID),
+			t.Subscriptions.Col("id").Eq(subscriptionID),
 		)
 	d.LogSQL(ds)
 
-	var result UserPlan
+	var result Subscription
 	found, err := ds.Executor().ScanStructContext(ctx, &result)
 	if err != nil {
 		return nil, err
@@ -53,23 +53,23 @@ func (d *Database) GetUserPlanByID(ctx context.Context, userPlanID string, opts 
 	return &result, nil
 }
 
-// GetActiveUserPlan returns the active user plan for the username passed in.
+// GetActiveSubscription returns the active user plan for the username passed in.
 // Accepts a variable number of QueryOptions, but only WithTX is currently
 // supported.
-func (d *Database) GetActiveUserPlan(ctx context.Context, username string, opts ...QueryOption) (*UserPlan, error) {
+func (d *Database) GetActiveSubscription(ctx context.Context, username string, opts ...QueryOption) (*Subscription, error) {
 	var (
 		err    error
-		result UserPlan
+		result Subscription
 		db     GoquDatabase
 	)
 
 	_, db = d.querySettings(opts...)
 
-	effStartDate := goqu.I("user_plans.effective_start_date")
-	effEndDate := goqu.I("user_plans.effective_end_date")
+	effStartDate := goqu.I("subscriptions.effective_start_date")
+	effEndDate := goqu.I("subscriptions.effective_end_date")
 	currTS := goqu.L("CURRENT_TIMESTAMP")
 
-	query := userPlanDS(db).
+	query := subscriptionDS(db).
 		Where(
 			t.Users.Col("username").Eq(username),
 			goqu.Or(
@@ -90,13 +90,13 @@ func (d *Database) GetActiveUserPlan(ctx context.Context, username string, opts 
 	return &result, nil
 }
 
-func (d *Database) SetActiveUserPlan(ctx context.Context, userID, planID string, opts ...QueryOption) (string, error) {
+func (d *Database) SetActiveSubscription(ctx context.Context, userID, planID string, opts ...QueryOption) (string, error) {
 	_, db := d.querySettings(opts...)
 
 	n := time.Now()
 	e := n.AddDate(1, 0, 0)
 
-	query := db.Insert(t.UserPlans).
+	query := db.Insert(t.Subscriptions).
 		Rows(
 			goqu.Record{
 				"effective_start_date": n,
@@ -107,11 +107,11 @@ func (d *Database) SetActiveUserPlan(ctx context.Context, userID, planID string,
 				"last_modified_by":     "de",
 			},
 		).
-		Returning(t.UserPlans.Col("id"))
+		Returning(t.Subscriptions.Col("id"))
 	d.LogSQL(query)
 
-	var userPlanID string
-	if _, err := query.Executor().ScanValContext(ctx, &userPlanID); err != nil {
+	var subscriptionID string
+	if _, err := query.Executor().ScanValContext(ctx, &subscriptionID); err != nil {
 		return "", err
 	}
 
@@ -119,7 +119,7 @@ func (d *Database) SetActiveUserPlan(ctx context.Context, userID, planID string,
 	ds := db.Insert(t.Quotas).
 		Cols(
 			"resource_type_id",
-			"user_plan_id",
+			"subscription_id",
 			"quota",
 			"created_by",
 			"last_modified_by",
@@ -128,7 +128,7 @@ func (d *Database) SetActiveUserPlan(ctx context.Context, userID, planID string,
 			goqu.From(t.PQD).
 				Select(
 					t.PQD.Col("resource_type_id"),
-					goqu.V(userPlanID).As("user_plan_id"),
+					goqu.V(subscriptionID).As("subscription_id"),
 					t.PQD.Col("quota_value").As("quota"),
 					goqu.V("de").As("created_by"),
 					goqu.V("de").As("last_modified_by"),
@@ -141,10 +141,10 @@ func (d *Database) SetActiveUserPlan(ctx context.Context, userID, planID string,
 	d.LogSQL(ds)
 
 	if _, err := ds.Executor().Exec(); err != nil {
-		return userPlanID, err
+		return subscriptionID, err
 	}
 
-	return userPlanID, nil
+	return subscriptionID, nil
 
 }
 
@@ -156,11 +156,11 @@ func (d *Database) UserHasActivePlan(ctx context.Context, username string, opts 
 
 	_, db = d.querySettings(opts...)
 
-	effStartDate := goqu.I("user_plans.effective_start_date")
-	effEndDate := goqu.I("user_plans.effective_end_date")
+	effStartDate := goqu.I("subscriptions.effective_start_date")
+	effEndDate := goqu.I("subscriptions.effective_end_date")
 
-	statement := db.From(t.UserPlans).
-		Join(t.Users, goqu.On(t.UserPlans.Col("user_id").Eq(t.Users.Col("id")))).
+	statement := db.From(t.Subscriptions).
+		Join(t.Users, goqu.On(t.Subscriptions.Col("user_id").Eq(t.Users.Col("id")))).
 		Where(
 			t.Users.Col("username").Eq(username),
 			goqu.Or(
@@ -183,12 +183,12 @@ func (d *Database) UserOnPlan(ctx context.Context, username, planName string, op
 
 	_, db := d.querySettings(opts...)
 
-	effStartDate := goqu.I("user_plans.effective_start_date")
-	effEndDate := goqu.I("user_plans.effective_end_date")
+	effStartDate := goqu.I("subscriptions.effective_start_date")
+	effEndDate := goqu.I("subscriptions.effective_end_date")
 
-	statement := db.From(t.UserPlans).
-		Join(t.Users, goqu.On(t.UserPlans.Col("user_id").Eq(t.Users.Col("id")))).
-		Join(t.Plans, goqu.On(t.UserPlans.Col("plan_id").Eq(t.Plans.Col("id")))).
+	statement := db.From(t.Subscriptions).
+		Join(t.Users, goqu.On(t.Subscriptions.Col("user_id").Eq(t.Users.Col("id")))).
+		Join(t.Plans, goqu.On(t.Subscriptions.Col("plan_id").Eq(t.Plans.Col("id")))).
 		Where(
 			t.Users.Col("username").Eq(username),
 			t.Plans.Col("name").Eq(planName),
@@ -207,10 +207,10 @@ func (d *Database) UserOnPlan(ctx context.Context, username, planName string, op
 	return numPlans > 0, nil
 }
 
-// UserPlanUsages returns a list of Usages associated with a user plan specified
+// SubscriptionUsages returns a list of Usages associated with a user plan specified
 // by the passed in UUID. Accepts a variable number of QueryOptions, though only
 // WithTX is currently supported.
-func (d *Database) UserPlanUsages(ctx context.Context, userPlanID string, opts ...QueryOption) ([]Usage, error) {
+func (d *Database) SubscriptionUsages(ctx context.Context, subscriptionID string, opts ...QueryOption) ([]Usage, error) {
 	var (
 		err    error
 		db     GoquDatabase
@@ -223,7 +223,7 @@ func (d *Database) UserPlanUsages(ctx context.Context, userPlanID string, opts .
 		Select(
 			t.Usages.Col("id").As("id"),
 			t.Usages.Col("usage").As("usage"),
-			t.Usages.Col("user_plan_id").As("user_plan_id"),
+			t.Usages.Col("subscription_id").As("subscription_id"),
 			t.Usages.Col("created_by").As("created_by"),
 			t.Usages.Col("created_at").As("created_at"),
 			t.Usages.Col("last_modified_by").As("last_modified_by"),
@@ -233,7 +233,7 @@ func (d *Database) UserPlanUsages(ctx context.Context, userPlanID string, opts .
 			t.RT.Col("unit").As(goqu.C("resource_types.unit")),
 		).
 		Join(t.RT, goqu.On(goqu.I("usages.resource_type_id").Eq(goqu.I("resource_types.id")))).
-		Where(t.Usages.Col("user_plan_id").Eq(userPlanID))
+		Where(t.Usages.Col("subscription_id").Eq(subscriptionID))
 	d.LogSQL(usagesQuery)
 
 	if err = usagesQuery.Executor().ScanStructsContext(ctx, &usages); err != nil {
@@ -243,10 +243,10 @@ func (d *Database) UserPlanUsages(ctx context.Context, userPlanID string, opts .
 	return usages, nil
 }
 
-// UserPlanQuotas returns a list of t.Quotas associated with the user plan specified
+// SubscriptionQuotas returns a list of t.Quotas associated with the user plan specified
 // by the UUID passed in. Accepts a variable number of QueryOptions, though only
 // WithTX is currently supported.
-func (d *Database) UserPlanQuotas(ctx context.Context, userPlanID string, opts ...QueryOption) ([]Quota, error) {
+func (d *Database) SubscriptionQuotas(ctx context.Context, subscriptionID string, opts ...QueryOption) ([]Quota, error) {
 	var (
 		err    error
 		db     GoquDatabase
@@ -268,7 +268,7 @@ func (d *Database) UserPlanQuotas(ctx context.Context, userPlanID string, opts .
 			t.RT.Col("unit").As(goqu.C("resource_types.unit")),
 		).
 		Join(t.RT, goqu.On(goqu.I("quotas.resource_type_id").Eq(goqu.I("resource_types.id")))).
-		Where(t.Quotas.Col("user_plan_id").Eq(userPlanID))
+		Where(t.Quotas.Col("subscription_id").Eq(subscriptionID))
 	d.LogSQL(quotasQuery)
 
 	if err = quotasQuery.Executor().ScanStructsContext(ctx, &quotas); err != nil {
@@ -278,10 +278,10 @@ func (d *Database) UserPlanQuotas(ctx context.Context, userPlanID string, opts .
 	return quotas, nil
 }
 
-// UserPlanQuotaDefaults returns a list of PlanQuotaDefaults associated with the
+// SubscriptionQuotaDefaults returns a list of PlanQuotaDefaults associated with the
 // plan (not user plan, just plan) specified by the UUID passed in. Accepts a
 // variable number of QueryOptions, though only WithTX is currently supported.
-func (d *Database) UserPlanQuotaDefaults(ctx context.Context, planID string, opts ...QueryOption) ([]PlanQuotaDefault, error) {
+func (d *Database) SubscriptionQuotaDefaults(ctx context.Context, planID string, opts ...QueryOption) ([]PlanQuotaDefault, error) {
 	var (
 		err      error
 		db       GoquDatabase
@@ -310,9 +310,9 @@ func (d *Database) UserPlanQuotaDefaults(ctx context.Context, planID string, opt
 	return defaults, nil
 }
 
-// LoadUserPlanDetails adds PlanQuotaDefaults, quotas and usages into a user plan. Accepts a variable number of
+// LoadSubscriptionDetails adds PlanQuotaDefaults, quotas and usages into a user plan. Accepts a variable number of
 // QuotaOptions, though only WithTX is currently supported.
-func (d *Database) LoadUserPlanDetails(ctx context.Context, userPlan *UserPlan, opts ...QueryOption) error {
+func (d *Database) LoadSubscriptionDetails(ctx context.Context, subscription *Subscription, opts ...QueryOption) error {
 	var (
 		err      error
 		defaults []PlanQuotaDefault
@@ -321,29 +321,29 @@ func (d *Database) LoadUserPlanDetails(ctx context.Context, userPlan *UserPlan, 
 	)
 
 	log.Debug("before getting user plan quota defaults")
-	defaults, err = d.UserPlanQuotaDefaults(ctx, userPlan.Plan.ID, opts...)
+	defaults, err = d.SubscriptionQuotaDefaults(ctx, subscription.Plan.ID, opts...)
 	if err != nil {
 		return err
 	}
 	log.Debug("after getting user plan quota defaults")
 
 	log.Debug("before getting user plan t.Quotas")
-	quotas, err = d.UserPlanQuotas(ctx, userPlan.ID, opts...)
+	quotas, err = d.SubscriptionQuotas(ctx, subscription.ID, opts...)
 	if err != nil {
 		return err
 	}
 	log.Debug("after getting user plan t.Quotas")
 
 	log.Debug("before getting user plan usages")
-	usages, err = d.UserPlanUsages(ctx, userPlan.ID, opts...)
+	usages, err = d.SubscriptionUsages(ctx, subscription.ID, opts...)
 	if err != nil {
 		return err
 	}
 	log.Debug("after getting user plan usages")
 
-	userPlan.Plan.QuotaDefaults = defaults
-	userPlan.Quotas = quotas
-	userPlan.Usages = usages
+	subscription.Plan.QuotaDefaults = defaults
+	subscription.Quotas = quotas
+	subscription.Usages = usages
 
 	return nil
 }

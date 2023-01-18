@@ -12,7 +12,7 @@ import (
 // was found and returned and is false when the actual quota was not found and
 // the default value was returned. Accepts a variable number of QuotaOptions,
 // but only WithTX is currently supported.
-func (d *Database) GetCurrentQuota(ctx context.Context, resourceTypeID, userPlanID string, opts ...QueryOption) (float64, bool, error) {
+func (d *Database) GetCurrentQuota(ctx context.Context, resourceTypeID, subscriptionID string, opts ...QueryOption) (float64, bool, error) {
 	var (
 		err        error
 		db         GoquDatabase
@@ -25,7 +25,7 @@ func (d *Database) GetCurrentQuota(ctx context.Context, resourceTypeID, userPlan
 		Select(goqu.C("quota")).
 		Where(goqu.And(
 			goqu.I("resource_type_id").Eq(resourceTypeID),
-			goqu.I("user_plan_id").Eq(userPlanID),
+			goqu.I("subscription_id").Eq(subscriptionID),
 		)).
 		Limit(1).
 		Executor()
@@ -45,7 +45,7 @@ func (d *Database) GetCurrentQuota(ctx context.Context, resourceTypeID, userPlan
 // UpsertQuota inserts or updates a quota into the database for the given
 // resource type and user plan. Accepts a variable number of QueryOptions,
 // though only WithTX is currently supported.
-func (d *Database) UpsertQuota(ctx context.Context, update bool, value float64, resourceTypeID, userPlanID string, opts ...QueryOption) error {
+func (d *Database) UpsertQuota(ctx context.Context, update bool, value float64, resourceTypeID, subscriptionID string, opts ...QueryOption) error {
 	var (
 		err error
 		db  GoquDatabase
@@ -56,7 +56,7 @@ func (d *Database) UpsertQuota(ctx context.Context, update bool, value float64, 
 	updateRecord := goqu.Record{
 		"quota":            value,
 		"resource_type_id": resourceTypeID,
-		"user_plan_id":     userPlanID,
+		"subscription_id":  subscriptionID,
 		"created_by":       "de",
 		"last_modified_by": "de",
 	}
@@ -68,7 +68,7 @@ func (d *Database) UpsertQuota(ctx context.Context, update bool, value float64, 
 		upsertE = db.Update("quotas").Set(updateRecord).Where(
 			goqu.And(
 				goqu.I("resource_type_id").Eq(resourceTypeID),
-				goqu.I("user_plan_id").Eq(userPlanID),
+				goqu.I("subscription_id").Eq(subscriptionID),
 			),
 		).Executor()
 	}

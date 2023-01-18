@@ -27,22 +27,22 @@ func (a *App) AddQuotaHandler(subject, reply string, request *qms.AddQuotaReques
 	ctx, span := pbinit.InitQMSAddQuotaRequest(request, subject)
 	defer span.End()
 
-	userPlanID := request.Quota.UserPlanId
+	subscriptionID := request.Quota.SubscriptionId
 
 	d := db.New(a.db)
 
-	_, update, err := d.GetCurrentQuota(ctx, request.Quota.ResourceType.Uuid, userPlanID)
+	_, update, err := d.GetCurrentQuota(ctx, request.Quota.ResourceType.Uuid, subscriptionID)
 	if err != nil {
 		sendError(ctx, response, err)
 		return
 	}
 
-	if err = d.UpsertQuota(ctx, update, float64(request.Quota.Quota), request.Quota.ResourceType.Uuid, userPlanID); err != nil {
+	if err = d.UpsertQuota(ctx, update, float64(request.Quota.Quota), request.Quota.ResourceType.Uuid, subscriptionID); err != nil {
 		sendError(ctx, response, err)
 		return
 	}
 
-	value, _, err := d.GetCurrentQuota(ctx, request.Quota.ResourceType.Uuid, userPlanID)
+	value, _, err := d.GetCurrentQuota(ctx, request.Quota.ResourceType.Uuid, subscriptionID)
 	if err != nil {
 		sendError(ctx, response, err)
 		return
@@ -50,7 +50,7 @@ func (a *App) AddQuotaHandler(subject, reply string, request *qms.AddQuotaReques
 
 	response.Quota.Quota = float32(value)
 	response.Quota.ResourceType = request.Quota.ResourceType
-	response.Quota.UserPlanId = userPlanID
+	response.Quota.SubscriptionId = subscriptionID
 
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)

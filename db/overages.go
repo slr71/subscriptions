@@ -18,9 +18,9 @@ func (d *Database) GetUserOverages(ctx context.Context, username string, opts ..
 
 	_, db = d.querySettings(opts...)
 
-	query := db.From(t.UserPlans).
+	query := db.From(t.Subscriptions).
 		Select(
-			t.UserPlans.Col("id").As("user_plan_id"),
+			t.Subscriptions.Col("id").As("subscription_id"),
 
 			t.Users.Col("id").As(goqu.C("users.id")),
 			t.Users.Col("username").As(goqu.C("users.username")),
@@ -36,18 +36,18 @@ func (d *Database) GetUserOverages(ctx context.Context, username string, opts ..
 			t.Quotas.Col("quota").As("quota_value"),
 			t.Usages.Col("usage").As("usage_value"),
 		).
-		Join(t.Users, goqu.On(t.UserPlans.Col("user_id").Eq(t.Users.Col("id")))).
-		Join(t.Plans, goqu.On(t.UserPlans.Col("plan_id").Eq(t.Plans.Col("id")))).
-		Join(t.Quotas, goqu.On(t.UserPlans.Col("id").Eq(t.Quotas.Col("user_plan_id")))).
-		Join(t.Usages, goqu.On(t.UserPlans.Col("id").Eq(t.Usages.Col("user_plan_id")))).
+		Join(t.Users, goqu.On(t.Subscriptions.Col("user_id").Eq(t.Users.Col("id")))).
+		Join(t.Plans, goqu.On(t.Subscriptions.Col("plan_id").Eq(t.Plans.Col("id")))).
+		Join(t.Quotas, goqu.On(t.Subscriptions.Col("id").Eq(t.Quotas.Col("subscription_id")))).
+		Join(t.Usages, goqu.On(t.Subscriptions.Col("id").Eq(t.Usages.Col("subscription_id")))).
 		Join(t.ResourceTypes, goqu.On(t.Usages.Col("resource_type_id").Eq(t.ResourceTypes.Col("id")))).
 		Where(goqu.And(
 			t.Users.Col("username").Eq(username),
 			goqu.Or(
-				CurrentTimestamp.Between(goqu.Range(t.UserPlans.Col("effective_start_date"), t.UserPlans.Col("effective_end_date"))),
+				CurrentTimestamp.Between(goqu.Range(t.Subscriptions.Col("effective_start_date"), t.Subscriptions.Col("effective_end_date"))),
 				goqu.And(
-					CurrentTimestamp.Gt(t.UserPlans.Col("effective_start_date")),
-					t.UserPlans.Col("effective_end_date").IsNull(),
+					CurrentTimestamp.Gt(t.Subscriptions.Col("effective_start_date")),
+					t.Subscriptions.Col("effective_end_date").IsNull(),
 				),
 			),
 			t.Usages.Col("resource_type_id").Eq(t.Quotas.Col("resource_type_id")),

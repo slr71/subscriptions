@@ -174,7 +174,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if err = natsClient.Subscribe(qmssubs.GetUserPlan, a.GetUserPlanHandler); err != nil {
+	if err = natsClient.Subscribe(qmssubs.GetSubscription, a.GetSubscriptionHandler); err != nil {
 		log.Fatal(err)
 	}
 
