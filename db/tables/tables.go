@@ -15,4 +15,5 @@ var (
 	Quotas            = goqu.T("quotas")
 	Usages            = goqu.T("usages")
 	Updates           = goqu.T("updates")
+	Addons            = goqu.T("addons")
 )
