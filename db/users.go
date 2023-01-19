@@ -107,7 +107,7 @@ func (d *Database) AddUser(ctx context.Context, username string, opts ...QueryOp
 // This function accepts a variable number of QueryOptions, but only WithTX is currently supported.
 func (d *Database) EnsureUser(ctx context.Context, username string, opts ...QueryOption) (*User, error) {
 	var (
-		wrapMsg string = "unable to ensure that the user exists in the database"
+		wrapMsg = "unable to ensure that the user exists in the database"
 		err     error
 		db      GoquDatabase
 		result  User
