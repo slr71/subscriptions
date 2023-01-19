@@ -237,3 +237,12 @@ type Overage struct {
 	QuotaValue     float64      `db:"quota_value"`
 	UsageValue     float64      `db:"usage_value"`
 }
+
+type Addon struct {
+	ID            string       `db:"id" goqu:"defaultifempty"`
+	Name          string       `db:"name"`
+	Description   string       `db:"description"`
+	ResourceType  ResourceType `db:"resource_types"`
+	DefaultAmount float64      `db:"default_amount"`
+	DefaultPaid   bool         `db:"default_paid"`
+}
