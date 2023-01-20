@@ -85,7 +85,7 @@ func (s *ConnectionSettings) toConnectOptions() []nats.Option {
 func NewConnection(settings *ConnectionSettings) (*nats.EncodedConn, error) {
 	log := log.WithFields(logrus.Fields{"context": "new nats conn"})
 
-	log.Debug("NATS Settings: %+v", settings)
+	log.Infof("establishing the NATS connection: %s", settings.ClusterURLS)
 
 	nc, err := nats.Connect(settings.ClusterURLS, settings.toConnectOptions()...)
 	if err != nil {
