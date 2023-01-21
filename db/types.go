@@ -143,6 +143,7 @@ func (up Subscription) ToQMSSubscription() *qms.Subscription {
 		Plan:               up.Plan.ToQMSPlan(),
 		Quotas:             quotas,
 		Usages:             usages,
+		Paid:               true,
 	}
 }
 
