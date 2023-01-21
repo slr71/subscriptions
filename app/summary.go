@@ -116,6 +116,8 @@ func (a *App) GetUserSummaryHandler(subject, reply string, request *qms.RequestB
 		return
 	}
 
+	log.Warnf("Reply: %s", reply)
+
 	response.Subscription = subscription
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
