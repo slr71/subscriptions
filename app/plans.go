@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cyverse-de/go-mod/pbinit"
 	"github.com/cyverse-de/p/go/qms"
@@ -168,5 +169,15 @@ func (a *App) GetPlanHandler(subject, reply string, request *qms.PlanRequest) {
 }
 
 func (a *App) UpsertQuotaDefaultsHandler(subject, reply string, request *qms.AddPlanQuotaDefaultRequest) {
-
+	sendError := func(ctx context.Context, response *qms.QuotaDefaultResponse, err error) {
+		log.Error(err)
+		response.Error = errors.NatsError(ctx, err)
+		if err = a.client.Respond(ctx, reply, response); err != nil {
+			log.Error(err)
+		}
+	}
+	response := pbinit.NewQuotaDefaultResponse()
+	ctx, span := pbinit.InitQMSAddPlanQuotaDefaultRequest(request, subject)
+	defer span.End()
+	sendError(ctx, response, fmt.Errorf("not implemented"))
 }
