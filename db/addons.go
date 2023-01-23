@@ -24,7 +24,7 @@ func (d *Database) AddAddon(ctx context.Context, addon *Addon, opts ...QueryOpti
 		Executor()
 
 	var newAddonID string
-	if err := ds.ScanValsContext(ctx, &newAddonID); err != nil {
+	if _, err := ds.ScanValContext(ctx, &newAddonID); err != nil {
 		return "", err
 	}
 
