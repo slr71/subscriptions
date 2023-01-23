@@ -50,6 +50,8 @@ github.com/cyverse-de/go-mod/subjects v0.0.6 h1:gQ3Rb2Tu7/kQMRCI1iSTyDB6yTHCUiZP
 github.com/cyverse-de/go-mod/subjects v0.0.6/go.mod h1:x8P+TNVSXvehkWMAmrg1RQHc5CCGafqtTKUn0hklkFA=
 github.com/cyverse-de/go-mod/subjects v0.1.0 h1:ba9v19djad2a+p+TmQiDsl668p2XLt5fhNd24R2rpwU=
 github.com/cyverse-de/go-mod/subjects v0.1.0/go.mod h1:x8P+TNVSXvehkWMAmrg1RQHc5CCGafqtTKUn0hklkFA=
+github.com/cyverse-de/go-mod/subjects v0.1.1 h1:o/Wv+lfBcbYRFUpv46afb0MuYZO95ixbQ59iZbU8q24=
+github.com/cyverse-de/go-mod/subjects v0.1.1/go.mod h1:x8P+TNVSXvehkWMAmrg1RQHc5CCGafqtTKUn0hklkFA=
 github.com/cyverse-de/p/go/analysis v0.0.13 h1:65hbQSnj1sDJcUnDJwMto/ncBxO6PSsWMFuIcyeQZV0=
 github.com/cyverse-de/p/go/analysis v0.0.13/go.mod h1:zI19t8ygFWsXKmcIb6cLAgiPRR+fHHT716hFNPbGDOc=
 github.com/cyverse-de/p/go/header v0.0.1 h1:YgI0DLIOvL6m0LF22tFUk3OHLtW5NCuNiaGqwkxv64s=
