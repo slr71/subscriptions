@@ -91,7 +91,7 @@ func (a *App) AddUserHandler(subject, reply string, request *qms.AddUserRequest)
 
 	if !hasPlan {
 		// If the user isn't on a plan, put them on one.
-		if _, err = d.SetActiveSubscription(ctx, userID, plan.ID, db.WithTX(tx)); err != nil {
+		if _, err = d.SetActiveSubscription(ctx, userID, plan.ID, true, db.WithTX(tx)); err != nil {
 			sendError(ctx, response, err)
 			return
 		}
@@ -106,7 +106,7 @@ func (a *App) AddUserHandler(subject, reply string, request *qms.AddUserRequest)
 
 		// If the user isn't on the plan contained in the request, put them on it.
 		if !onPlan {
-			if _, err = d.SetActiveSubscription(ctx, userID, plan.ID, db.WithTX(tx)); err != nil {
+			if _, err = d.SetActiveSubscription(ctx, userID, plan.ID, true, db.WithTX(tx)); err != nil {
 				sendError(ctx, response, err)
 				return
 			}
