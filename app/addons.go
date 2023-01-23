@@ -19,9 +19,6 @@ func (a *App) AddAddonHandler(subject, reply string, request *qms.AddAddonReques
 
 	response := qmsinit.NewAddonResponse()
 
-	ctx, span := qmsinit.InitAddAddonRequest(request, subject)
-	defer span.End()
-
 	sendError := func(ctx context.Context, response *qms.AddonResponse, err error) {
 		log.Error(err)
 		response.Error = serrors.NatsError(ctx, err)
@@ -29,6 +26,9 @@ func (a *App) AddAddonHandler(subject, reply string, request *qms.AddAddonReques
 			log.Error(err)
 		}
 	}
+
+	ctx, span := qmsinit.InitAddAddonRequest(request, subject)
+	defer span.End()
 
 	d := db.New(a.db)
 
@@ -81,6 +81,41 @@ func (a *App) AddAddonHandler(subject, reply string, request *qms.AddAddonReques
 
 	response.Addon = newAddon.ToQMSType()
 	response.Addon.Uuid = newID
+
+	if err = a.client.Respond(ctx, reply, response); err != nil {
+		log.Error(err)
+	}
+}
+
+func (a *App) ListAddonsHandler(subject, reply string, request *qms.NoParamsRequest) {
+	var err error
+
+	log := log.WithField("context", "list addons")
+
+	response := qmsinit.NewAddonListResponse()
+
+	sendError := func(ctx context.Context, response *qms.AddonListResponse, err error) {
+		log.Error(err)
+		response.Error = serrors.NatsError(ctx, err)
+		if err = a.client.Respond(ctx, reply, response); err != nil {
+			log.Error(err)
+		}
+	}
+
+	ctx, span := qmsinit.InitNoParamsRequest(request, subject)
+	defer span.End()
+
+	d := db.New(a.db)
+
+	results, err := d.ListAddons(ctx)
+	if err != nil {
+		sendError(ctx, response, err)
+		return
+	}
+
+	for _, addon := range results {
+		response.Addons = append(response.Addons, addon.ToQMSType())
+	}
 
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
