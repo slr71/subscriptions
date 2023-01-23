@@ -77,24 +77,34 @@ func (a *App) AddPlanHandler(subject, reply string, request *qms.AddPlanRequest)
 	d := db.New(a.db)
 
 	var qd []db.PlanQuotaDefault
-
-	for _, pqd := range request.Plan.PlanQuotaDefaults {
-		qd = append(qd, db.PlanQuotaDefault{
-			QuotaValue: float64(pqd.QuotaValue),
-			ResourceType: db.ResourceType{
-				ID:   pqd.ResourceType.Uuid,
-				Name: pqd.ResourceType.Name,
-				Unit: pqd.ResourceType.Unit,
-			},
-		})
+	var newPlanID string
+	tx, err := d.Begin()
+	if err != nil {
+		sendError(ctx, response, err)
+		return
 	}
+	err = tx.Wrap(func() error {
+		var err error
 
-	newPlanID, err := d.AddPlan(ctx, &db.Plan{
-		Name:          request.Plan.Name,
-		Description:   request.Plan.Description,
-		QuotaDefaults: qd,
+		for _, pqd := range request.Plan.PlanQuotaDefaults {
+			qd = append(qd, db.PlanQuotaDefault{
+				QuotaValue: float64(pqd.QuotaValue),
+				ResourceType: db.ResourceType{
+					ID:   pqd.ResourceType.Uuid,
+					Name: pqd.ResourceType.Name,
+					Unit: pqd.ResourceType.Unit,
+				},
+			})
+		}
+
+		newPlanID, err = d.AddPlan(ctx, &db.Plan{
+			Name:          request.Plan.Name,
+			Description:   request.Plan.Description,
+			QuotaDefaults: qd,
+		}, db.WithTX(tx))
+
+		return err
 	})
-
 	if err != nil {
 		sendError(ctx, response, err)
 		return
