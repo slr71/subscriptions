@@ -34,7 +34,19 @@ func (d *Database) AddAddon(ctx context.Context, addon *Addon, opts ...QueryOpti
 func (d *Database) ListAddons(ctx context.Context, opts ...QueryOption) ([]Addon, error) {
 	_, db := d.querySettings(opts...)
 
-	ds := db.From(t.Addons)
+	ds := db.From(t.Addons).
+		Select(
+			t.Addons.Col("id"),
+			t.Addons.Col("name"),
+			t.Addons.Col("description"),
+			t.Addons.Col("default_amount"),
+			t.Addons.Col("default_paid"),
+
+			t.ResourceTypes.Col("id").As(goqu.C("resource_types.id")),
+			t.ResourceTypes.Col("name").As(goqu.C("resource_types.name")),
+			t.ResourceTypes.Col("unit").As(goqu.C("resource_types.unit")),
+		).
+		Join(t.ResourceTypes, goqu.On(t.Addons.Col("resource_type_id").Eq(t.ResourceTypes.Col("id"))))
 	d.LogSQL(ds)
 
 	var addons []Addon
