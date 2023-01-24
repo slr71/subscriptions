@@ -142,8 +142,8 @@ func (d *Database) AddPlan(ctx context.Context, plan *Plan, opts ...QueryOption)
 		Executor()
 
 	var newPlanID string
-	if err := ds.ScanValsContext(ctx, newPlanID); err != nil {
-		return "", err
+	if _, err := ds.ScanValContext(ctx, &newPlanID); err != nil {
+		return "", errors.Wrap(err, "unable to add the new plan")
 	}
 
 	for _, pqd := range plan.QuotaDefaults {
@@ -156,8 +156,9 @@ func (d *Database) AddPlan(ctx context.Context, plan *Plan, opts ...QueryOption)
 				},
 			).Executor()
 
-		if _, err := newDS.ExecContext(ctx); err != nil {
-			return "", err
+		if _, err := newDS.ExecContext(ctx); err !=
+			nil {
+			return "", errors.Wrap(err, "unable to add plan quota defaults")
 		}
 	}
 

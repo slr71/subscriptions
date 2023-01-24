@@ -47,8 +47,10 @@ func main() {
 		dotEnvPath     = flag.String("dotenv-path", cfg.DefaultDotEnvPath, "Path to the dotenv file")
 		tlsCert        = flag.String("tlscert", gotelnats.DefaultTLSCertPath, "Path to the NATS TLS cert file")
 		tlsKey         = flag.String("tlskey", gotelnats.DefaultTLSKeyPath, "Path to the NATS TLS key file")
+		noTLS          = flag.Bool("no-tls", false, "Used to disable TLS for the connection to NATS")
 		caCert         = flag.String("tlsca", gotelnats.DefaultTLSCAPath, "Path to the NATS TLS CA file")
 		credsPath      = flag.String("creds", gotelnats.DefaultCredsPath, "Path to the NATS creds file")
+		noCreds        = flag.Bool("no-creds", false, "Used to disable client credentials for NATS")
 		maxReconnects  = flag.Int("max-reconnects", gotelnats.DefaultMaxReconnects, "Maximum number of reconnection attempts to NATS")
 		reconnectWait  = flag.Int("reconnect-wait", gotelnats.DefaultReconnectWait, "Seconds to wait between reconnection attempts to NATS")
 		natsSubject    = flag.String("subject", "cyverse.qms.>", "NATS subject to subscribe to")
@@ -112,9 +114,11 @@ func main() {
 	natsSettings := natscl.ConnectionSettings{
 		ClusterURLS:   natsCluster,
 		CredsPath:     *credsPath,
+		CredsEnabled:  !*noCreds,
 		TLSCACertPath: *caCert,
 		TLSCertPath:   *tlsCert,
 		TLSKeyPath:    *tlsKey,
+		TLSEnabled:    !*noTLS,
 		MaxReconnects: *maxReconnects,
 		ReconnectWait: *reconnectWait,
 	}

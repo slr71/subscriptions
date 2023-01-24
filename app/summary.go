@@ -50,7 +50,7 @@ func (a *App) GetUserSummary(ctx context.Context, username string) (*qms.Subscri
 				return err
 			}
 
-			subscriptionID, err := d.SetActiveSubscription(ctx, user.ID, plan.ID, db.WithTX(tx))
+			subscriptionID, err := d.SetActiveSubscription(ctx, user.ID, plan.ID, false, db.WithTX(tx))
 			if err != nil {
 				log.Errorf("unable to subscribe the user to the default plan: %s", err)
 				return err
@@ -115,6 +115,8 @@ func (a *App) GetUserSummaryHandler(subject, reply string, request *qms.RequestB
 		sendError(ctx, response, err)
 		return
 	}
+
+	log.Warnf("Reply: %s", reply)
 
 	response.Subscription = subscription
 	if err = a.client.Respond(ctx, reply, response); err != nil {

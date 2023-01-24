@@ -48,9 +48,11 @@ func (a *App) AddQuotaHandler(subject, reply string, request *qms.AddQuotaReques
 		return
 	}
 
-	response.Quota.Quota = float32(value)
-	response.Quota.ResourceType = request.Quota.ResourceType
-	response.Quota.SubscriptionId = subscriptionID
+	response.Quota = &qms.Quota{
+		Quota:          float32(value),
+		ResourceType:   request.Quota.ResourceType,
+		SubscriptionId: subscriptionID,
+	}
 
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
