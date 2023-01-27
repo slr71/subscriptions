@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cyverse-de/go-mod/pbinit"
 	"github.com/cyverse-de/p/go/qms"
@@ -77,24 +78,34 @@ func (a *App) AddPlanHandler(subject, reply string, request *qms.AddPlanRequest)
 	d := db.New(a.db)
 
 	var qd []db.PlanQuotaDefault
-
-	for _, pqd := range request.Plan.PlanQuotaDefaults {
-		qd = append(qd, db.PlanQuotaDefault{
-			QuotaValue: float64(pqd.QuotaValue),
-			ResourceType: db.ResourceType{
-				ID:   pqd.ResourceType.Uuid,
-				Name: pqd.ResourceType.Name,
-				Unit: pqd.ResourceType.Unit,
-			},
-		})
+	var newPlanID string
+	tx, err := d.Begin()
+	if err != nil {
+		sendError(ctx, response, err)
+		return
 	}
+	err = tx.Wrap(func() error {
+		var err error
 
-	newPlanID, err := d.AddPlan(ctx, &db.Plan{
-		Name:          request.Plan.Name,
-		Description:   request.Plan.Description,
-		QuotaDefaults: qd,
+		for _, pqd := range request.Plan.PlanQuotaDefaults {
+			qd = append(qd, db.PlanQuotaDefault{
+				QuotaValue: float64(pqd.QuotaValue),
+				ResourceType: db.ResourceType{
+					ID:   pqd.ResourceType.Uuid,
+					Name: pqd.ResourceType.Name,
+					Unit: pqd.ResourceType.Unit,
+				},
+			})
+		}
+
+		newPlanID, err = d.AddPlan(ctx, &db.Plan{
+			Name:          request.Plan.Name,
+			Description:   request.Plan.Description,
+			QuotaDefaults: qd,
+		}, db.WithTX(tx))
+
+		return err
 	})
-
 	if err != nil {
 		sendError(ctx, response, err)
 		return
@@ -158,5 +169,15 @@ func (a *App) GetPlanHandler(subject, reply string, request *qms.PlanRequest) {
 }
 
 func (a *App) UpsertQuotaDefaultsHandler(subject, reply string, request *qms.AddPlanQuotaDefaultRequest) {
-
+	sendError := func(ctx context.Context, response *qms.QuotaDefaultResponse, err error) {
+		log.Error(err)
+		response.Error = errors.NatsError(ctx, err)
+		if err = a.client.Respond(ctx, reply, response); err != nil {
+			log.Error(err)
+		}
+	}
+	response := pbinit.NewQuotaDefaultResponse()
+	ctx, span := pbinit.InitQMSAddPlanQuotaDefaultRequest(request, subject)
+	defer span.End()
+	sendError(ctx, response, fmt.Errorf("not implemented"))
 }

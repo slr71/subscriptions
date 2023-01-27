@@ -128,6 +128,7 @@ type Subscription struct {
 	CreatedAt          time.Time `db:"created_at" goqu:"defaultifempty"`
 	LastModifiedBy     string    `db:"last_modified_by"`
 	LastModifiedAt     string    `db:"last_modified_at" goqu:"defaultifempty"`
+	Paid               bool      `db:"paid" goqu:"defaultifempty"`
 }
 
 func (up Subscription) ToQMSSubscription() *qms.Subscription {
@@ -151,6 +152,7 @@ func (up Subscription) ToQMSSubscription() *qms.Subscription {
 		Plan:               up.Plan.ToQMSPlan(),
 		Quotas:             quotas,
 		Usages:             usages,
+		Paid:               up.Paid,
 	}
 }
 

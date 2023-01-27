@@ -49,8 +49,9 @@ func (a *App) AddUserHandler(subject, reply string, request *qms.AddUserRequest)
 		_ = tx.Rollback()
 	}()
 
-	// get the plan named in the request
+	// extract information about the subscription from the request
 	planName := request.PlanName
+	paid := request.Paid
 
 	plan, err := d.GetPlanByName(ctx, planName, db.WithTX(tx))
 	if err != nil {
@@ -91,7 +92,7 @@ func (a *App) AddUserHandler(subject, reply string, request *qms.AddUserRequest)
 
 	if !hasPlan {
 		// If the user isn't on a plan, put them on one.
-		if _, err = d.SetActiveSubscription(ctx, userID, plan.ID, db.WithTX(tx)); err != nil {
+		if _, err = d.SetActiveSubscription(ctx, userID, plan.ID, paid, db.WithTX(tx)); err != nil {
 			sendError(ctx, response, err)
 			return
 		}
@@ -106,7 +107,7 @@ func (a *App) AddUserHandler(subject, reply string, request *qms.AddUserRequest)
 
 		// If the user isn't on the plan contained in the request, put them on it.
 		if !onPlan {
-			if _, err = d.SetActiveSubscription(ctx, userID, plan.ID, db.WithTX(tx)); err != nil {
+			if _, err = d.SetActiveSubscription(ctx, userID, plan.ID, paid, db.WithTX(tx)); err != nil {
 				sendError(ctx, response, err)
 				return
 			}

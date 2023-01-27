@@ -20,6 +20,7 @@ func subscriptionDS(db GoquDatabase) *goqu.SelectDataset {
 			t.Subscriptions.Col("created_at").As("created_at"),
 			t.Subscriptions.Col("last_modified_by").As("last_modified_by"),
 			t.Subscriptions.Col("last_modified_at").As("last_modified_at"),
+			t.Subscriptions.Col("paid").As("paid"),
 
 			t.Users.Col("id").As(goqu.C("users.id")),
 			t.Users.Col("username").As(goqu.C("users.username")),
@@ -90,7 +91,9 @@ func (d *Database) GetActiveSubscription(ctx context.Context, username string, o
 	return &result, nil
 }
 
-func (d *Database) SetActiveSubscription(ctx context.Context, userID, planID string, opts ...QueryOption) (string, error) {
+func (d *Database) SetActiveSubscription(
+	ctx context.Context, userID, planID string, paid bool, opts ...QueryOption,
+) (string, error) {
 	_, db := d.querySettings(opts...)
 
 	n := time.Now()
@@ -105,6 +108,7 @@ func (d *Database) SetActiveSubscription(ctx context.Context, userID, planID str
 				"plan_id":              planID,
 				"created_by":           "de",
 				"last_modified_by":     "de",
+				"paid":                 paid,
 			},
 		).
 		Returning(t.Subscriptions.Col("id"))
