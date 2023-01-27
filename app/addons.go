@@ -56,14 +56,21 @@ func (a *App) AddAddonHandler(subject, reply string, request *qms.AddAddonReques
 
 	var lookupRT *db.ResourceType
 
+	tx, err := d.Begin()
+	if err != nil {
+		sendError(ctx, response, err)
+		return
+	}
+	defer tx.Rollback()
+
 	if reqAddon.ResourceType.Name != "" && reqAddon.ResourceType.Uuid == "" {
-		lookupRT, err = d.GetResourceTypeByName(ctx, reqAddon.ResourceType.Name)
+		lookupRT, err = d.GetResourceTypeByName(ctx, reqAddon.ResourceType.Name, db.WithTX(tx))
 		if err != nil {
 			sendError(ctx, response, err)
 			return
 		}
 	} else {
-		lookupRT, err = d.GetResourceType(ctx, reqAddon.ResourceType.Uuid)
+		lookupRT, err = d.GetResourceType(ctx, reqAddon.ResourceType.Uuid, db.WithTX(tx))
 		if err != nil {
 			sendError(ctx, response, err)
 			return
@@ -73,8 +80,13 @@ func (a *App) AddAddonHandler(subject, reply string, request *qms.AddAddonReques
 	newAddon := db.NewAddonFromQMS(request.Addon)
 	newAddon.ResourceType = *lookupRT
 
-	newID, err := d.AddAddon(ctx, newAddon)
+	newID, err := d.AddAddon(ctx, newAddon, db.WithTX(tx))
 	if err != nil {
+		sendError(ctx, response, err)
+		return
+	}
+
+	if err = tx.Commit(); err != nil {
 		sendError(ctx, response, err)
 		return
 	}
