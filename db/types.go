@@ -79,6 +79,14 @@ func (rt ResourceType) ToQMSResourceType() *qms.ResourceType {
 	}
 }
 
+func NewResourceTypeFromQMS(q *qms.ResourceType) *ResourceType {
+	return &ResourceType{
+		ID:   q.Uuid,
+		Name: q.Name,
+		Unit: q.Unit,
+	}
+}
+
 var ResourceTypeNames = []string{
 	"cpu.hours",
 	"data.size",
@@ -238,4 +246,38 @@ type Overage struct {
 	ResourceType   ResourceType `db:"resource_types"`
 	QuotaValue     float64      `db:"quota_value"`
 	UsageValue     float64      `db:"usage_value"`
+}
+
+type Addon struct {
+	ID            string       `db:"id" goqu:"defaultifempty"`
+	Name          string       `db:"name"`
+	Description   string       `db:"description"`
+	ResourceType  ResourceType `db:"resource_types"`
+	DefaultAmount float64      `db:"default_amount"`
+	DefaultPaid   bool         `db:"default_paid"`
+}
+
+func NewAddonFromQMS(q *qms.Addon) *Addon {
+	return &Addon{
+		Name:          q.Name,
+		Description:   q.Description,
+		DefaultAmount: float64(q.DefaultAmount),
+		DefaultPaid:   q.DefaultPaid,
+		ResourceType:  *NewResourceTypeFromQMS(q.ResourceType),
+	}
+}
+
+func (a *Addon) ToQMSType() *qms.Addon {
+	return &qms.Addon{
+		Uuid:          a.ID,
+		Name:          a.Name,
+		Description:   a.Description,
+		DefaultAmount: float32(a.DefaultAmount),
+		DefaultPaid:   a.DefaultPaid,
+		ResourceType: &qms.ResourceType{
+			Uuid: a.ResourceType.ID,
+			Name: a.ResourceType.Name,
+			Unit: a.ResourceType.Unit,
+		},
+	}
 }
