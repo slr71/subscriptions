@@ -56,3 +56,58 @@ func (d *Database) ListAddons(ctx context.Context, opts ...QueryOption) ([]Addon
 
 	return addons, nil
 }
+
+func (d *Database) UpdateAddon(ctx context.Context, updatedAddon *UpdateAddon, opts ...QueryOption) (*Addon, error) {
+	_, db := d.querySettings(opts...)
+
+	rec := goqu.Record{}
+
+	if updatedAddon.UpdateName {
+		rec["name"] = updatedAddon.Name
+	}
+	if updatedAddon.UpdateDescription {
+		rec["description"] = updatedAddon.Description
+	}
+	if updatedAddon.UpdateResourceType {
+		rec["resource_type_id"] = updatedAddon.ResourceTypeID
+	}
+	if updatedAddon.UpdateDefaultAmount {
+		rec["default_amount"] = updatedAddon.DefaultAmount
+	}
+	if updatedAddon.UpdateDefaultPaid {
+		rec["default_paid"] = updatedAddon.DefaultPaid
+	}
+
+	ds := db.Update(t.Addons).
+		Set(rec).
+		Where(t.Addons.Col("id").Eq(updatedAddon.ID)).
+		Returning(
+			t.Addons.Col("id"),
+			t.Addons.Col("name"),
+			t.Addons.Col("description"),
+			t.Addons.Col("default_amount"),
+			t.Addons.Col("default_paid"),
+			t.Addons.Col("resource_type_id").As(goqu.C("resource_types.id")),
+		).
+		Executor()
+
+	retval := &Addon{}
+	_, err := ds.ScanStructContext(ctx, retval)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to scan results of update")
+	}
+
+	return retval, nil
+}
+
+func (d *Database) DeleteAddon(ctx context.Context, addonID string, opts ...QueryOption) error {
+	_, db := d.querySettings(opts...)
+
+	ds := db.From(t.Addons).
+		Delete().
+		Where(t.Addons.Col("id").Eq(addonID)).
+		Executor()
+
+	_, err := ds.ExecContext(ctx)
+	return err
+}
