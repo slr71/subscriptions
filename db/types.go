@@ -249,7 +249,7 @@ type Overage struct {
 }
 
 type Addon struct {
-	ID            string       `db:"id" goqu:"defaultifempty"`
+	ID            string       `db:"id" goqu:"defaultifempty,skipupdate"`
 	Name          string       `db:"name"`
 	Description   string       `db:"description"`
 	ResourceType  ResourceType `db:"resource_types"`
@@ -279,5 +279,35 @@ func (a *Addon) ToQMSType() *qms.Addon {
 			Name: a.ResourceType.Name,
 			Unit: a.ResourceType.Unit,
 		},
+	}
+}
+
+type UpdateAddon struct {
+	ID                  string  `db:"id" goqu:"skipupdate"`
+	Name                string  `db:"name"`
+	UpdateName          bool    `db:"-"`
+	Description         string  `db:"description"`
+	UpdateDescription   bool    `db:"-"`
+	ResourceTypeID      string  `db:"resource_type_id"`
+	UpdateResourceType  bool    `db:"-"`
+	DefaultAmount       float64 `db:"default_amount"`
+	UpdateDefaultAmount bool    `db:"-"`
+	DefaultPaid         bool    `db:"default_paid"`
+	UpdateDefaultPaid   bool    `db:"-"`
+}
+
+func NewUpdateAddonFromQMS(u *qms.UpdateAddonRequest) *UpdateAddon {
+	return &UpdateAddon{
+		ID:                  u.Addon.Uuid,
+		Name:                u.Addon.Name,
+		UpdateName:          u.UpdateName,
+		Description:         u.Addon.Description,
+		UpdateDescription:   u.UpdateDescription,
+		ResourceTypeID:      u.Addon.ResourceType.Uuid,
+		UpdateResourceType:  u.UpdateResourceType,
+		DefaultAmount:       float64(u.Addon.DefaultAmount),
+		UpdateDefaultAmount: u.UpdateDefaultAmount,
+		DefaultPaid:         u.Addon.DefaultPaid,
+		UpdateDefaultPaid:   u.UpdateDefaultAmount,
 	}
 }
