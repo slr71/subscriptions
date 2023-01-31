@@ -210,6 +210,10 @@ func main() {
 		log.Fatal(err)
 	}
 
+	if err = natsClient.Subscribe(qmssubs.UpdateAddon, a.UpdateAddonHandler); err != nil {
+		log.Fatal(err)
+	}
+
 	srv := fmt.Sprintf(":%s", strconv.Itoa(*listenPort))
 	log.Fatal(http.ListenAndServe(srv, nil))
 }
