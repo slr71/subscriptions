@@ -81,7 +81,14 @@ func (d *Database) UpdateAddon(ctx context.Context, updatedAddon *UpdateAddon, o
 	ds := db.Update(t.Addons).
 		Set(rec).
 		Where(t.Addons.Col("id").Eq(updatedAddon.ID)).
-		Returning(t.Addons.All()).
+		Returning(
+			t.Addons.Col("id"),
+			t.Addons.Col("name"),
+			t.Addons.Col("description"),
+			t.Addons.Col("default_amount"),
+			t.Addons.Col("default_paid"),
+			t.Addons.Col("resource_type_id").As(goqu.C("resource_types.id")),
+		).
 		Executor()
 
 	retval := &Addon{}

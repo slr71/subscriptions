@@ -297,17 +297,28 @@ type UpdateAddon struct {
 }
 
 func NewUpdateAddonFromQMS(u *qms.UpdateAddonRequest) *UpdateAddon {
-	return &UpdateAddon{
+	update := &UpdateAddon{
 		ID:                  u.Addon.Uuid,
-		Name:                u.Addon.Name,
 		UpdateName:          u.UpdateName,
-		Description:         u.Addon.Description,
 		UpdateDescription:   u.UpdateDescription,
-		ResourceTypeID:      u.Addon.ResourceType.Uuid,
 		UpdateResourceType:  u.UpdateResourceType,
-		DefaultAmount:       float64(u.Addon.DefaultAmount),
 		UpdateDefaultAmount: u.UpdateDefaultAmount,
-		DefaultPaid:         u.Addon.DefaultPaid,
 		UpdateDefaultPaid:   u.UpdateDefaultAmount,
 	}
+	if update.UpdateName {
+		update.Name = u.Addon.Name
+	}
+	if update.UpdateDescription {
+		update.Description = u.Addon.Description
+	}
+	if update.UpdateDefaultAmount {
+		update.DefaultAmount = float64(u.Addon.DefaultAmount)
+	}
+	if update.UpdateDefaultPaid {
+		update.DefaultPaid = u.Addon.DefaultPaid
+	}
+	if update.UpdateResourceType {
+		update.ResourceTypeID = u.Addon.ResourceType.Uuid
+	}
+	return update
 }
