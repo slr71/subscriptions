@@ -90,8 +90,11 @@ func (d *Database) ToggleAddonPaid(ctx context.Context, addonID string, opts ...
 			t.ResourceTypes.Col("name").As(goqu.C("resource_types.name")),
 			t.ResourceTypes.Col("unit").As(goqu.C("resource_types.unit")),
 		).
+		Join(t.ResourceTypes, goqu.On(t.Addons.Col("resource_type_id").Eq(t.ResourceTypes.Col("id")))).
 		Where(t.Addons.Col("id").Eq(addonID)).
 		Executor()
+
+	d.LogSQL(ds2)
 
 	retval := &Addon{}
 	_, err = ds2.ScanStructContext(ctx, retval)

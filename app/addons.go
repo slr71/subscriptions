@@ -232,4 +232,8 @@ func (a *App) ToggleAddonPaidHandler(subject, reply string, request *requests.By
 
 	response.Addon = result.ToQMSType()
 
+	if err = a.client.Respond(ctx, reply, response); err != nil {
+		log.Error(err)
+	}
+
 }
