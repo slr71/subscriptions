@@ -99,3 +99,15 @@ func (d *Database) UpdateAddon(ctx context.Context, updatedAddon *UpdateAddon, o
 
 	return retval, nil
 }
+
+func (d *Database) DeleteAddon(ctx context.Context, addonID string, opts ...QueryOption) error {
+	_, db := d.querySettings(opts...)
+
+	ds := db.From(t.Addons).
+		Delete().
+		Where(t.Addons.Col("id").Eq(addonID)).
+		Executor()
+
+	_, err := ds.ExecContext(ctx)
+	return err
+}

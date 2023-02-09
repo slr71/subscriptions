@@ -26,6 +26,8 @@ github.com/cyverse-de/go-mod/otelutils v0.0.3 h1:4DAxvkZhf7YRUJeHaCyodbWv7t+tLzF
 github.com/cyverse-de/go-mod/otelutils v0.0.3/go.mod h1:h75ZnGtwiwGwHgqpxFQL0912bnHMrcOKfyGAv2+q2Vw=
 github.com/cyverse-de/go-mod/pbinit v0.1.5 h1:6AVsIflZ+C9GvXvI8SOIH5agJLqJ6fpoaoNWoHwFics=
 github.com/cyverse-de/go-mod/pbinit v0.1.5/go.mod h1:Nh7X/NjW/l7m+eelpNc3BDa6pgAFwi7SjtlNiiUQxdE=
+github.com/cyverse-de/go-mod/pbinit v0.1.6 h1:mRV8GYuK8NUFJ0GqElMmVDEH44+r9wlIKY87BRz9Q+4=
+github.com/cyverse-de/go-mod/pbinit v0.1.6/go.mod h1:PWnXL2U+Z0oDOtIpqj2R9qsoSO3rNY57AlInFqWSygo=
 github.com/cyverse-de/go-mod/protobufjson v0.0.3 h1:XTIZejY7EUbpF6ZdhRhiFX9PGYDkGGmPP760cDswGWM=
 github.com/cyverse-de/go-mod/protobufjson v0.0.3/go.mod h1:p/ASemjpl2GEFYb3Tt7N8RozViwonsK0fOm0LxYeCt8=
 github.com/cyverse-de/go-mod/subjects v0.1.1 h1:o/Wv+lfBcbYRFUpv46afb0MuYZO95ixbQ59iZbU8q24=
@@ -40,6 +42,8 @@ github.com/cyverse-de/p/go/monitoring v0.0.2 h1:oI/zt2a7k66JOKs9z+3QT7EzRYbPee+m
 github.com/cyverse-de/p/go/monitoring v0.0.2/go.mod h1:UzSOg02RZ3GEm8iuQu39Hbo8rnYDfZ5XzZnN8UQYCyY=
 github.com/cyverse-de/p/go/qms v0.1.4 h1:5GWhB+g3t3X+m/ugqlD6+/zsfoCVRAYNRAWXC7tUP+Q=
 github.com/cyverse-de/p/go/qms v0.1.4/go.mod h1:lDNWgFPsT0sg3fqHHEE2yhERNsfFueYJiprxtoOnp4c=
+github.com/cyverse-de/p/go/requests v0.0.1 h1:2QZ1ZApFYXaZklMT/JtIcVbNYu7NaVUxGaX7+QgwGIc=
+github.com/cyverse-de/p/go/requests v0.0.1/go.mod h1:6KzPlbRlBg62BZmX/cckUf5Da/qAvIMbBhctoHi57Bc=
 github.com/cyverse-de/p/go/svcerror v0.0.7 h1:PScx8ctSBtnkER6ypgWsuxe8p3/jgfh6t/Dy5J9tg48=
 github.com/cyverse-de/p/go/svcerror v0.0.7/go.mod h1:8rTmVk7xKLCbXSG4CLxlwQ10mc5tV3vdp4P4BjXPvyE=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

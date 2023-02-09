@@ -8,7 +8,9 @@ import (
 	serrors "github.com/cyverse-de/subscriptions/errors"
 
 	qmsinit "github.com/cyverse-de/go-mod/pbinit/qms"
+	reqinit "github.com/cyverse-de/go-mod/pbinit/requests"
 	"github.com/cyverse-de/p/go/qms"
+	"github.com/cyverse-de/p/go/requests"
 	"github.com/cyverse-de/subscriptions/db"
 )
 
@@ -168,6 +170,40 @@ func (a *App) UpdateAddonHandler(subject, reply string, request *qms.UpdateAddon
 	}
 
 	response.Addon = result.ToQMSType()
+
+	if err = a.client.Respond(ctx, reply, response); err != nil {
+		log.Error(err)
+	}
+}
+
+func (a *App) DeleteAddonHandler(subject, reply string, request *requests.ByUUID) {
+	var err error
+
+	log := log.WithField("context", "delete addon")
+
+	response := qmsinit.NewAddonResponse()
+
+	sendError := func(ctx context.Context, response *qms.AddonResponse, err error) {
+		log.Error(err)
+		response.Error = serrors.NatsError(ctx, err)
+		if err = a.client.Respond(ctx, reply, response); err != nil {
+			log.Error(err)
+		}
+	}
+
+	ctx, span := reqinit.InitByUUID(request, subject)
+	defer span.End()
+
+	d := db.New(a.db)
+
+	if err = d.DeleteAddon(ctx, request.Uuid); err != nil {
+		sendError(ctx, response, err)
+		return
+	}
+
+	response.Addon = &qms.Addon{
+		Uuid: request.Uuid,
+	}
 
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
