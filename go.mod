@@ -8,9 +8,11 @@ require (
 	github.com/cyverse-de/go-mod/logging v0.0.2
 	github.com/cyverse-de/go-mod/otelutils v0.0.3
 	github.com/cyverse-de/go-mod/pbinit v0.1.6
+	github.com/cyverse-de/go-mod/pbinit v0.1.6
 	github.com/cyverse-de/go-mod/protobufjson v0.0.3
-	github.com/cyverse-de/go-mod/subjects v0.1.2
+	github.com/cyverse-de/go-mod/subjects v0.1.3
 	github.com/cyverse-de/p/go/qms v0.1.4
+	github.com/cyverse-de/p/go/requests v0.0.1
 	github.com/cyverse-de/p/go/svcerror v0.0.7
 	github.com/doug-martin/goqu/v9 v9.18.0
 	github.com/jmoiron/sqlx v1.3.5
@@ -30,7 +32,6 @@ require (
 	github.com/cyverse-de/p/go/analysis v0.0.13 // indirect
 	github.com/cyverse-de/p/go/header v0.0.3 // indirect
 	github.com/cyverse-de/p/go/monitoring v0.0.2 // indirect
-	github.com/cyverse-de/p/go/requests v0.0.1 // indirect
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect

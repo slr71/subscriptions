@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	serrors "github.com/cyverse-de/subscriptions/errors"
+	"github.com/sirupsen/logrus"
 
 	qmsinit "github.com/cyverse-de/go-mod/pbinit/qms"
 	reqinit "github.com/cyverse-de/go-mod/pbinit/requests"
@@ -14,24 +15,35 @@ import (
 	"github.com/cyverse-de/subscriptions/db"
 )
 
-func (a *App) AddAddonHandler(subject, reply string, request *qms.AddAddonRequest) {
-	var err error
-
-	log := log.WithField("context", "adding new available addon")
-
-	response := qmsinit.NewAddonResponse()
-
-	sendError := func(ctx context.Context, response *qms.AddonResponse, err error) {
+func (a *App) sendAddonResponseError(reply string, log *logrus.Entry) func(context.Context, *qms.AddonResponse, error) {
+	return func(ctx context.Context, response *qms.AddonResponse, err error) {
 		log.Error(err)
 		response.Error = serrors.NatsError(ctx, err)
 		if err = a.client.Respond(ctx, reply, response); err != nil {
 			log.Error(err)
 		}
 	}
+}
+
+func (a *App) sendAddonListResponseError(reply string, log *logrus.Entry) func(context.Context, *qms.AddonListResponse, error) {
+	return func(ctx context.Context, response *qms.AddonListResponse, err error) {
+		log.Error(err)
+		response.Error = serrors.NatsError(ctx, err)
+		if err = a.client.Respond(ctx, reply, response); err != nil {
+			log.Error(err)
+		}
+	}
+}
+
+func (a *App) AddAddonHandler(subject, reply string, request *qms.AddAddonRequest) {
+	var err error
 
 	ctx, span := qmsinit.InitAddAddonRequest(request, subject)
 	defer span.End()
 
+	log := log.WithField("context", "adding new available addon")
+	response := qmsinit.NewAddonResponse()
+	sendError := a.sendAddonResponseError(reply, log)
 	d := db.New(a.db)
 
 	reqAddon := request.Addon
@@ -104,21 +116,12 @@ func (a *App) AddAddonHandler(subject, reply string, request *qms.AddAddonReques
 func (a *App) ListAddonsHandler(subject, reply string, request *qms.NoParamsRequest) {
 	var err error
 
-	log := log.WithField("context", "list addons")
-
-	response := qmsinit.NewAddonListResponse()
-
-	sendError := func(ctx context.Context, response *qms.AddonListResponse, err error) {
-		log.Error(err)
-		response.Error = serrors.NatsError(ctx, err)
-		if err = a.client.Respond(ctx, reply, response); err != nil {
-			log.Error(err)
-		}
-	}
-
 	ctx, span := qmsinit.InitNoParamsRequest(request, subject)
 	defer span.End()
 
+	log := log.WithField("context", "list addons")
+	sendError := a.sendAddonListResponseError(reply, log)
+	response := qmsinit.NewAddonListResponse()
 	d := db.New(a.db)
 
 	results, err := d.ListAddons(ctx)
@@ -208,4 +211,29 @@ func (a *App) DeleteAddonHandler(subject, reply string, request *requests.ByUUID
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
+}
+
+func (a *App) ToggleAddonPaidHandler(subject, reply string, request *requests.ByUUID) {
+	var err error
+
+	ctx, span := reqinit.InitByUUID(request, subject)
+	defer span.End()
+
+	log := log.WithField("context", "toggle addon paid")
+	response := qmsinit.NewAddonResponse()
+	sendError := a.sendAddonResponseError(reply, log)
+	d := db.New(a.db)
+
+	result, err := d.ToggleAddonPaid(ctx, request.Uuid)
+	if err != nil {
+		sendError(ctx, response, err)
+		return
+	}
+
+	response.Addon = result.ToQMSType()
+
+	if err = a.client.Respond(ctx, reply, response); err != nil {
+		log.Error(err)
+	}
+
 }
