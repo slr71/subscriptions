@@ -212,28 +212,3 @@ func (a *App) DeleteAddonHandler(subject, reply string, request *requests.ByUUID
 		log.Error(err)
 	}
 }
-
-func (a *App) ToggleAddonPaidHandler(subject, reply string, request *requests.ByUUID) {
-	var err error
-
-	ctx, span := reqinit.InitByUUID(request, subject)
-	defer span.End()
-
-	log := log.WithField("context", "toggle addon paid")
-	response := qmsinit.NewAddonResponse()
-	sendError := a.sendAddonResponseError(reply, log)
-	d := db.New(a.db)
-
-	result, err := d.ToggleAddonPaid(ctx, request.Uuid)
-	if err != nil {
-		sendError(ctx, response, err)
-		return
-	}
-
-	response.Addon = result.ToQMSType()
-
-	if err = a.client.Respond(ctx, reply, response); err != nil {
-		log.Error(err)
-	}
-
-}

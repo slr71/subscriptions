@@ -166,7 +166,6 @@ func main() {
 		qmssubs.UpsertQuotaDefaults: a.UpsertQuotaDefaultsHandler,
 		qmssubs.AddAddon:            a.AddAddonHandler,
 		qmssubs.ListAddons:          a.ListAddonsHandler,
-		qmssubs.ToggleAddonPaid:     a.ToggleAddonPaidHandler,
 		qmssubs.UpdateAddon:         a.UpdateAddonHandler,
 		qmssubs.DeleteAddon:         a.DeleteAddonHandler,
 	}
