@@ -133,3 +133,43 @@ func (a *App) ListAddonsHandler(subject, reply string, request *qms.NoParamsRequ
 		log.Error(err)
 	}
 }
+
+func (a *App) UpdateAddonHandler(subject, reply string, request *qms.UpdateAddonRequest) {
+	var err error
+
+	log := log.WithField("context", "update addon")
+
+	response := qmsinit.NewAddonResponse()
+
+	sendError := func(ctx context.Context, response *qms.AddonResponse, err error) {
+		log.Error(err)
+		response.Error = serrors.NatsError(ctx, err)
+		if err = a.client.Respond(ctx, reply, response); err != nil {
+			log.Error(err)
+		}
+	}
+
+	ctx, span := qmsinit.InitUpdateAddonRequest(request, subject)
+	defer span.End()
+
+	d := db.New(a.db)
+
+	if request.Addon.Uuid == "" {
+		sendError(ctx, response, errors.New("uuid must be set in the request"))
+		return
+	}
+
+	updateAddon := db.NewUpdateAddonFromQMS(request)
+
+	result, err := d.UpdateAddon(ctx, updateAddon)
+	if err != nil {
+		sendError(ctx, response, err)
+		return
+	}
+
+	response.Addon = result.ToQMSType()
+
+	if err = a.client.Respond(ctx, reply, response); err != nil {
+		log.Error(err)
+	}
+}
