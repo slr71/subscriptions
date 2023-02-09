@@ -143,70 +143,43 @@ func main() {
 
 	a := app.New(natsClient, dbconn, userSuffix)
 
-	if err = natsClient.Subscribe(qmssubs.GetUserUpdates, a.GetUserUpdatesHandler); err != nil {
+	handlers := map[string]nats.Handler{
+		qmssubs.GetUserUpdates: a.GetUserUpdatesHandler,
+		qmssubs.AddUserUpdate:  a.AddUserUpdateHandler,
+
+		// Only call these two endpoints if you need to correct a usage value and
+		// bypass the updates tables.
+		qmssubs.GetUserUsages: a.GetUsagesHandler,
+		qmssubs.AddUserUsages: a.AddUsageHandler,
+
+		// These will get used by frontend calls to check for user overages.
+		qmssubs.GetUserOverages:   a.GetUserOverages,
+		qmssubs.CheckUserOverages: a.CheckUserOverages,
+
+		qmssubs.UserSummary:         a.GetUserSummaryHandler,
+		qmssubs.AddUser:             a.AddUserHandler,
+		qmssubs.GetSubscription:     a.GetSubscriptionHandler,
+		qmssubs.AddQuota:            a.AddQuotaHandler,
+		qmssubs.ListPlans:           a.AddQuotaHandler,
+		qmssubs.AddPlan:             a.AddPlanHandler,
+		qmssubs.GetPlan:             a.GetPlanHandler,
+		qmssubs.UpsertQuotaDefaults: a.UpsertQuotaDefaultsHandler,
+		qmssubs.AddAddon:            a.AddAddonHandler,
+		qmssubs.ListAddons:          a.ListAddonsHandler,
+		qmssubs.ToggleAddonPaid:     a.ToggleAddonPaidHandler,
+	}
+
+	for subject, handler := range handlers {
+		if err = natsClient.Subscribe(subject, handler); err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	if err = natsClient.Subscribe(qmssubs.UpdateAddon, a.UpdateAddonHandler); err != nil {
 		log.Fatal(err)
 	}
 
-	if err = natsClient.Subscribe(qmssubs.AddUserUpdate, a.AddUserUpdateHandler); err != nil {
-		log.Fatal(err)
-	}
-
-	// Only call these two endpoints if you need to correct a usage value and
-	// bypass the updates tables.
-	if err = natsClient.Subscribe(qmssubs.GetUserUsages, a.GetUsagesHandler); err != nil {
-		log.Fatal(err)
-	}
-
-	if err = natsClient.Subscribe(qmssubs.AddUserUsages, a.AddUsageHandler); err != nil {
-		log.Fatal(err)
-	}
-
-	// These will get used by frontend calls to check for user overages.
-	if err = natsClient.Subscribe(qmssubs.GetUserOverages, a.GetUserOverages); err != nil {
-		log.Fatal(err)
-	}
-
-	if err = natsClient.Subscribe(qmssubs.CheckUserOverages, a.CheckUserOverages); err != nil {
-		log.Fatal(err)
-	}
-
-	if err = natsClient.Subscribe(qmssubs.UserSummary, a.GetUserSummaryHandler); err != nil {
-		log.Fatal(err)
-	}
-
-	if err = natsClient.Subscribe(qmssubs.AddUser, a.AddUserHandler); err != nil {
-		log.Fatal(err)
-	}
-
-	if err = natsClient.Subscribe(qmssubs.GetSubscription, a.GetSubscriptionHandler); err != nil {
-		log.Fatal(err)
-	}
-
-	if err = natsClient.Subscribe(qmssubs.AddQuota, a.AddQuotaHandler); err != nil {
-		log.Fatal(err)
-	}
-
-	if err = natsClient.Subscribe(qmssubs.ListPlans, a.ListPlansHandler); err != nil {
-		log.Fatal(err)
-	}
-
-	if err = natsClient.Subscribe(qmssubs.AddPlan, a.AddPlanHandler); err != nil {
-		log.Fatal(err)
-	}
-
-	if err = natsClient.Subscribe(qmssubs.GetPlan, a.GetPlanHandler); err != nil {
-		log.Fatal(err)
-	}
-
-	if err = natsClient.Subscribe(qmssubs.UpsertQuotaDefaults, a.UpsertQuotaDefaultsHandler); err != nil {
-		log.Fatal(err)
-	}
-
-	if err = natsClient.Subscribe(qmssubs.AddAddon, a.AddAddonHandler); err != nil {
-		log.Fatal(err)
-	}
-
-	if err = natsClient.Subscribe(qmssubs.ListAddons, a.ListAddonsHandler); err != nil {
+	if err = natsClient.Subscribe(qmssubs.DeleteAddon, a.DeleteAddonHandler); err != nil {
 		log.Fatal(err)
 	}
 

@@ -8,7 +8,18 @@ import (
 	"github.com/cyverse-de/p/go/qms"
 	"github.com/cyverse-de/subscriptions/db"
 	"github.com/cyverse-de/subscriptions/errors"
+	"github.com/sirupsen/logrus"
 )
+
+func (a *App) sendPlanResponseError(reply string, log *logrus.Entry) func(context.Context, *qms.PlanResponse, error) {
+	return func(ctx context.Context, response *qms.PlanResponse, err error) {
+		log.Error(err)
+		response.Error = errors.NatsError(ctx, err)
+		if err = a.client.Respond(ctx, reply, response); err != nil {
+			log.Error(err)
+		}
+	}
+}
 
 func (a *App) ListPlansHandler(subject, reply string, request *qms.NoParamsRequest) {
 	log := log.WithField("context", "list plans")
@@ -63,13 +74,7 @@ func (a *App) ListPlansHandler(subject, reply string, request *qms.NoParamsReque
 func (a *App) AddPlanHandler(subject, reply string, request *qms.AddPlanRequest) {
 	log := log.WithField("context", "list plans")
 
-	sendError := func(ctx context.Context, response *qms.PlanResponse, err error) {
-		log.Error(err)
-		response.Error = errors.NatsError(ctx, err)
-		if err = a.client.Respond(ctx, reply, response); err != nil {
-			log.Error(err)
-		}
-	}
+	sendError := a.sendPlanResponseError(reply, log)
 
 	response := pbinit.NewPlanResponse()
 	ctx, span := pbinit.InitQMSAddPlanRequest(request, subject)
@@ -122,13 +127,7 @@ func (a *App) AddPlanHandler(subject, reply string, request *qms.AddPlanRequest)
 func (a *App) GetPlanHandler(subject, reply string, request *qms.PlanRequest) {
 	log := log.WithField("context", "get plan")
 
-	sendError := func(ctx context.Context, response *qms.PlanResponse, err error) {
-		log.Error(err)
-		response.Error = errors.NatsError(ctx, err)
-		if err = a.client.Respond(ctx, reply, response); err != nil {
-			log.Error(err)
-		}
-	}
+	sendError := a.sendPlanResponseError(reply, log)
 
 	response := pbinit.NewPlanResponse()
 	ctx, span := pbinit.InitQMSPlanRequest(request, subject)
