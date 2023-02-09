@@ -160,7 +160,7 @@ func main() {
 		qmssubs.AddUser:             a.AddUserHandler,
 		qmssubs.GetSubscription:     a.GetSubscriptionHandler,
 		qmssubs.AddQuota:            a.AddQuotaHandler,
-		qmssubs.ListPlans:           a.AddQuotaHandler,
+		qmssubs.ListPlans:           a.ListPlansHandler,
 		qmssubs.AddPlan:             a.AddPlanHandler,
 		qmssubs.GetPlan:             a.GetPlanHandler,
 		qmssubs.UpsertQuotaDefaults: a.UpsertQuotaDefaultsHandler,
