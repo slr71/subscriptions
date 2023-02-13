@@ -287,13 +287,49 @@ func (a *App) AddSubscriptionAddonHandler(subject, reply string, request *reques
 		return
 	}
 
-	result, err := d.AddSubscriptionAddon(ctx, subscriptionID, addonID)
+	tx, err := d.Begin()
+	if err != nil {
+		sendError(ctx, response, err)
+		return
+	}
+	defer tx.Rollback()
+
+	subAddon, err := d.AddSubscriptionAddon(ctx, subscriptionID, addonID, db.WithTXRollbackCommit(tx, false, false))
 	if err != nil {
 		sendError(ctx, response, err)
 		return
 	}
 
-	response.SubscriptionAddon = result.ToQMSType()
+	quotaValue, quotaFound, err := d.GetCurrentQuota(
+		ctx,
+		subAddon.Addon.ResourceType.ID,
+		subscriptionID,
+		db.WithTXRollbackCommit(tx, false, false),
+	)
+	if err != nil {
+		sendError(ctx, response, err)
+		return
+	}
+
+	quotaValue = quotaValue + subAddon.Amount
+	if err = d.UpsertQuota(
+		ctx,
+		quotaFound,
+		quotaValue,
+		subAddon.Addon.ResourceType.ID,
+		subscriptionID,
+		db.WithTXRollbackCommit(tx, false, false),
+	); err != nil {
+		sendError(ctx, response, err)
+		return
+	}
+
+	if err = tx.Commit(); err != nil {
+		sendError(ctx, response, err)
+		return
+	}
+
+	response.SubscriptionAddon = subAddon.ToQMSType()
 
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
