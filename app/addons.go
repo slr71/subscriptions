@@ -35,6 +35,16 @@ func (a *App) sendAddonListResponseError(reply string, log *logrus.Entry) func(c
 	}
 }
 
+func (a *App) sendSubscriptionAddonListResponseError(reply string, log *logrus.Entry) func(context.Context, *qms.SubscriptionAddonListResponse, error) {
+	return func(ctx context.Context, response *qms.SubscriptionAddonListResponse, err error) {
+		log.Error(err)
+		response.Error = serrors.NatsError(ctx, err)
+		if err = a.client.Respond(ctx, reply, response); err != nil {
+			log.Error(err)
+		}
+	}
+}
+
 func (a *App) AddAddonHandler(subject, reply string, request *qms.AddAddonRequest) {
 	var err error
 
@@ -113,6 +123,9 @@ func (a *App) AddAddonHandler(subject, reply string, request *qms.AddAddonReques
 	}
 }
 
+// ListAddonsHandler lists all of the available add-ons in the system. These are
+// the ones that can be applied to a subscription, not the ones that have been
+// applied already.
 func (a *App) ListAddonsHandler(subject, reply string, request *qms.NoParamsRequest) {
 	var err error
 
@@ -206,6 +219,34 @@ func (a *App) DeleteAddonHandler(subject, reply string, request *requests.ByUUID
 
 	response.Addon = &qms.Addon{
 		Uuid: request.Uuid,
+	}
+
+	if err = a.client.Respond(ctx, reply, response); err != nil {
+		log.Error(err)
+	}
+}
+
+// ListSubscriptionAddonsHandler lists the add-ons that have been applied to the
+// indicated subscription.
+func (a *App) ListSubscriptionAddonsHandler(subject, reply string, request *requests.ByUUID) {
+	var err error
+
+	ctx, span := reqinit.InitByUUID(request, subject)
+	defer span.End()
+
+	log := log.WithField("context", "listing subscription add-ons")
+	response := qmsinit.NewSubscriptionAddonListResponse()
+	sendError := a.sendSubscriptionAddonListResponseError(reply, log)
+	d := db.New(a.db)
+
+	results, err := d.ListSubscriptionAddons(ctx, request.Uuid)
+	if err != nil {
+		sendError(ctx, response, err)
+		return
+	}
+
+	for _, addon := range results {
+		response.SubscriptionAddons = append(response.SubscriptionAddons, addon.ToQMSType())
 	}
 
 	if err = a.client.Respond(ctx, reply, response); err != nil {

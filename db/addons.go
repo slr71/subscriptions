@@ -31,6 +31,22 @@ func (d *Database) AddAddon(ctx context.Context, addon *Addon, opts ...QueryOpti
 	return newAddonID, nil
 }
 
+func addonDS(db GoquDatabase) *goqu.SelectDataset {
+	return db.From(t.Addons).
+		Select(
+			t.Addons.Col("id"),
+			t.Addons.Col("name"),
+			t.Addons.Col("description"),
+			t.Addons.Col("default_amount"),
+			t.Addons.Col("default_paid"),
+
+			t.ResourceTypes.Col("id").As(goqu.C("resource_types.id")),
+			t.ResourceTypes.Col("name").As(goqu.C("resource_types.name")),
+			t.ResourceTypes.Col("unit").As(goqu.C("resource_types.unit")),
+		).
+		Join(t.ResourceTypes, goqu.On(t.Addons.Col("resource_type_id").Eq(t.ResourceTypes.Col("id"))))
+}
+
 func (d *Database) ListAddons(ctx context.Context, opts ...QueryOption) ([]Addon, error) {
 	_, db := d.querySettings(opts...)
 
@@ -50,6 +66,30 @@ func (d *Database) ListAddons(ctx context.Context, opts ...QueryOption) ([]Addon
 	d.LogSQL(ds)
 
 	var addons []Addon
+	if err := ds.ScanStructsContext(ctx, &addons); err != nil {
+		return nil, errors.Wrap(err, "unable to list addons")
+	}
+
+	return addons, nil
+}
+
+func (d *Database) ListSubscriptionAddons(ctx context.Context, subscriptionID string, opts ...QueryOption) ([]SubscriptionAddon, error) {
+	_, db := d.querySettings(opts...)
+
+	ds := db.From(t.SubscriptionAddons).
+		Select(
+			t.SubscriptionAddons.Col("id"),
+			addonDS(db).As("addons"),
+			subscriptionDS(db).As("subscriptions"),
+			t.SubscriptionAddons.Col("amount"),
+			t.SubscriptionAddons.Col("paid"),
+		).
+		Join(t.Subscriptions, goqu.On(t.SubscriptionAddons.Col("subscription_id").Eq(t.Subscriptions.Col("id")))).
+		Join(t.Addons, goqu.On(t.Addons.Col("id").Eq(t.SubscriptionAddons.Col("addon_id"))))
+
+	d.LogSQL(ds)
+
+	var addons []SubscriptionAddon
 	if err := ds.ScanStructsContext(ctx, &addons); err != nil {
 		return nil, errors.Wrap(err, "unable to list addons")
 	}
