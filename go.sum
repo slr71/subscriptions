@@ -36,6 +36,8 @@ github.com/cyverse-de/go-mod/protobufjson v0.0.3 h1:XTIZejY7EUbpF6ZdhRhiFX9PGYDk
 github.com/cyverse-de/go-mod/protobufjson v0.0.3/go.mod h1:p/ASemjpl2GEFYb3Tt7N8RozViwonsK0fOm0LxYeCt8=
 github.com/cyverse-de/go-mod/subjects v0.1.3 h1:0DLzHzr8TQn0UdQGGFY0LKzqy46FzJ+eFH8i6omv7q0=
 github.com/cyverse-de/go-mod/subjects v0.1.3/go.mod h1:x8P+TNVSXvehkWMAmrg1RQHc5CCGafqtTKUn0hklkFA=
+github.com/cyverse-de/go-mod/subjects v0.1.4 h1:w2LSkQAQLjK054QW4c155HgcJww8nn3nwBknzlWU0BM=
+github.com/cyverse-de/go-mod/subjects v0.1.4/go.mod h1:x8P+TNVSXvehkWMAmrg1RQHc5CCGafqtTKUn0hklkFA=
 github.com/cyverse-de/p/go/analysis v0.0.13 h1:65hbQSnj1sDJcUnDJwMto/ncBxO6PSsWMFuIcyeQZV0=
 github.com/cyverse-de/p/go/analysis v0.0.13/go.mod h1:zI19t8ygFWsXKmcIb6cLAgiPRR+fHHT716hFNPbGDOc=
 github.com/cyverse-de/p/go/header v0.0.3 h1:d0IBiG7nDrFxvetSnxL0tB2j7yIgumvYaRkoUg/uA9Q=
