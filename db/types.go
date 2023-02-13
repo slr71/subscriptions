@@ -406,7 +406,7 @@ type SubscriptionAddon struct {
 	Addon        Addon        `db:"addons"`
 	Subscription Subscription `db:"subscriptions"`
 	Amount       float64      `db:"amount"`
-	Paid         bool         `db:"bool"`
+	Paid         bool         `db:"paid"`
 }
 
 func NewSubscriptionAddonFromQMS(sa *qms.SubscriptionAddon) *SubscriptionAddon {

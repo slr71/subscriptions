@@ -73,54 +73,6 @@ func (d *Database) ListAddons(ctx context.Context, opts ...QueryOption) ([]Addon
 	return addons, nil
 }
 
-func (d *Database) ListSubscriptionAddons(ctx context.Context, subscriptionID string, opts ...QueryOption) ([]SubscriptionAddon, error) {
-	_, db := d.querySettings(opts...)
-
-	ds := db.From(t.SubscriptionAddons).
-		Select(
-			t.SubscriptionAddons.Col("id"),
-
-			t.Addons.Col("id").As(goqu.C("addons.id")),
-			t.Addons.Col("name").As(goqu.C("addons.name")),
-			t.Addons.Col("description").As(goqu.C("addons.description")),
-			t.Addons.Col("default_amount").As(goqu.C("addons.default_amount")),
-			t.Addons.Col("default_paid").As(goqu.C("addons.default_paid")),
-			t.ResourceTypes.Col("id").As(goqu.C("addons.resource_types.id")),
-			t.ResourceTypes.Col("name").As(goqu.C("addons.resource_types.name")),
-			t.ResourceTypes.Col("unit").As(goqu.C("addons.resource_types.unit")),
-
-			t.Subscriptions.Col("id").As(goqu.C("subscriptions.id")),
-			t.Subscriptions.Col("effective_start_date").As(goqu.C("subscriptions.effective_start_date")),
-			t.Subscriptions.Col("effective_end_date").As(goqu.C("subscriptions.effective_end_date")),
-			t.Subscriptions.Col("created_by").As(goqu.C("subscriptions.created_by")),
-			t.Subscriptions.Col("created_at").As(goqu.C("subscriptions.created_at")),
-			t.Subscriptions.Col("last_modified_by").As(goqu.C("subscriptions.last_modified_by")),
-			t.Subscriptions.Col("last_modified_at").As(goqu.C("subscriptions.last_modified_at")),
-			t.Subscriptions.Col("paid").As(goqu.C("subscriptions.paid")),
-			t.Users.Col("id").As(goqu.C("subscriptions.users.id")),
-			t.Users.Col("username").As(goqu.C("subscriptions.users.username")),
-			t.Plans.Col("id").As(goqu.C("subscriptions.plans.id")),
-			t.Plans.Col("name").As(goqu.C("subscriptions.plans.name")),
-			t.Plans.Col("description").As(goqu.C("subscriptions.plans.description")),
-
-			t.SubscriptionAddons.Col("amount"),
-			t.SubscriptionAddons.Col("paid"),
-		).
-		Join(t.Subscriptions, goqu.On(t.SubscriptionAddons.Col("subscription_id").Eq(t.Subscriptions.Col("id")))).
-		Join(t.Addons, goqu.On(t.Addons.Col("id").Eq(t.SubscriptionAddons.Col("addon_id")))).
-		Join(t.ResourceTypes, goqu.On(t.Addons.Col("resource_type_id").Eq(t.ResourceTypes.Col("id")))).
-		Join(t.Users, goqu.On(t.Subscriptions.Col("user_id").Eq(t.Users.Col("id")))).
-		Join(t.Plans, goqu.On(t.Subscriptions.Col("plan_id").Eq(t.Plans.Col("id"))))
-	d.LogSQL(ds)
-
-	var addons []SubscriptionAddon
-	if err := ds.ScanStructsContext(ctx, &addons); err != nil {
-		return nil, errors.Wrap(err, "unable to list addons")
-	}
-
-	return addons, nil
-}
-
 func (d *Database) ToggleAddonPaid(ctx context.Context, addonID string, opts ...QueryOption) (*Addon, error) {
 	tx, err := d.Begin()
 	if err != nil {
@@ -226,4 +178,110 @@ func (d *Database) DeleteAddon(ctx context.Context, addonID string, opts ...Quer
 
 	_, err := ds.ExecContext(ctx)
 	return err
+}
+
+func (d *Database) ListSubscriptionAddons(ctx context.Context, subscriptionID string, opts ...QueryOption) ([]SubscriptionAddon, error) {
+	_, db := d.querySettings(opts...)
+
+	ds := db.From(t.SubscriptionAddons).
+		Select(
+			t.SubscriptionAddons.Col("id"),
+
+			t.Addons.Col("id").As(goqu.C("addons.id")),
+			t.Addons.Col("name").As(goqu.C("addons.name")),
+			t.Addons.Col("description").As(goqu.C("addons.description")),
+			t.Addons.Col("default_amount").As(goqu.C("addons.default_amount")),
+			t.Addons.Col("default_paid").As(goqu.C("addons.default_paid")),
+			t.ResourceTypes.Col("id").As(goqu.C("addons.resource_types.id")),
+			t.ResourceTypes.Col("name").As(goqu.C("addons.resource_types.name")),
+			t.ResourceTypes.Col("unit").As(goqu.C("addons.resource_types.unit")),
+
+			t.Subscriptions.Col("id").As(goqu.C("subscriptions.id")),
+			t.Subscriptions.Col("effective_start_date").As(goqu.C("subscriptions.effective_start_date")),
+			t.Subscriptions.Col("effective_end_date").As(goqu.C("subscriptions.effective_end_date")),
+			t.Subscriptions.Col("created_by").As(goqu.C("subscriptions.created_by")),
+			t.Subscriptions.Col("created_at").As(goqu.C("subscriptions.created_at")),
+			t.Subscriptions.Col("last_modified_by").As(goqu.C("subscriptions.last_modified_by")),
+			t.Subscriptions.Col("last_modified_at").As(goqu.C("subscriptions.last_modified_at")),
+			t.Subscriptions.Col("paid").As(goqu.C("subscriptions.paid")),
+			t.Users.Col("id").As(goqu.C("subscriptions.users.id")),
+			t.Users.Col("username").As(goqu.C("subscriptions.users.username")),
+			t.Plans.Col("id").As(goqu.C("subscriptions.plans.id")),
+			t.Plans.Col("name").As(goqu.C("subscriptions.plans.name")),
+			t.Plans.Col("description").As(goqu.C("subscriptions.plans.description")),
+
+			t.SubscriptionAddons.Col("amount"),
+			t.SubscriptionAddons.Col("paid"),
+		).
+		Join(t.Subscriptions, goqu.On(t.SubscriptionAddons.Col("subscription_id").Eq(t.Subscriptions.Col("id")))).
+		Join(t.Addons, goqu.On(t.Addons.Col("id").Eq(t.SubscriptionAddons.Col("addon_id")))).
+		Join(t.ResourceTypes, goqu.On(t.Addons.Col("resource_type_id").Eq(t.ResourceTypes.Col("id")))).
+		Join(t.Users, goqu.On(t.Subscriptions.Col("user_id").Eq(t.Users.Col("id")))).
+		Join(t.Plans, goqu.On(t.Subscriptions.Col("plan_id").Eq(t.Plans.Col("id"))))
+	d.LogSQL(ds)
+
+	var addons []SubscriptionAddon
+	if err := ds.ScanStructsContext(ctx, &addons); err != nil {
+		return nil, errors.Wrap(err, "unable to list addons")
+	}
+
+	return addons, nil
+}
+
+func (d *Database) AddSubscriptionAddon(ctx context.Context, subscriptionID, addonID string, opts ...QueryOption) (*SubscriptionAddon, error) {
+	qs, db, err := d.querySettingsWithTX(opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	if qs.doRollback {
+		defer db.Rollback()
+	}
+
+	var addonFound bool
+	addon := &Addon{}
+	addonInfo := addonDS(db).
+		Where(t.Addons.Col("id").Eq(addonID)).
+		Executor()
+
+	if addonFound, err = addonInfo.ScanStructContext(ctx, addon); err != nil || !addonFound {
+		return nil, errors.Wrap(err, "unable to get add-on info")
+	}
+
+	ds := db.Insert(t.SubscriptionAddons).
+		Rows(goqu.Record{
+			"subscription_id": subscriptionID,
+			"addon_id":        addonID,
+			"amount":          addon.DefaultAmount,
+			"paid":            addon.DefaultPaid,
+		}).
+		Returning(t.SubscriptionAddons.Col("id")).
+		Executor()
+
+	var newAddonID string
+	if _, err = ds.ScanValContext(ctx, &newAddonID); err != nil {
+		return nil, err
+	}
+
+	subscription, err := d.GetSubscriptionByID(ctx, subscriptionID, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	if qs.doCommit {
+		if err = db.Commit(); err != nil {
+			return nil, err
+		}
+	}
+
+	retval := &SubscriptionAddon{
+		ID:           newAddonID,
+		Addon:        *addon,
+		Subscription: *subscription,
+		Amount:       addon.DefaultAmount,
+		Paid:         addon.DefaultPaid,
+	}
+
+	return retval, nil
+
 }

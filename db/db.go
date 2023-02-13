@@ -65,14 +65,43 @@ func (d *Database) querySettings(opts ...QueryOption) (*QuerySettings, GoquDatab
 	return querySettings, db
 }
 
+// querySettingsWithTX is the same as querySettings(), except it will return a
+// new transaction if one is not passed in. Callers are responsible for managing
+// rollbacks and commits.
+func (d *Database) querySettingsWithTX(opts ...QueryOption) (*QuerySettings, *goqu.TxDatabase, error) {
+	var db *goqu.TxDatabase
+
+	querySettings := &QuerySettings{}
+	for _, opt := range opts {
+		opt(querySettings)
+	}
+
+	if querySettings.tx != nil {
+		db = querySettings.tx
+	} else {
+		tx, err := d.Begin()
+		if err != nil {
+			return nil, nil, err
+		}
+		db = tx
+		querySettings.tx = tx
+		querySettings.doCommit = true
+		querySettings.doRollback = true
+	}
+
+	return querySettings, db, nil
+}
+
 // QuerySettings provides configuration for queries, such as including a limit
 // statement, an offset statement, or running the query as part of a transaction.
 type QuerySettings struct {
-	hasLimit  bool
-	limit     uint
-	hasOffset bool
-	offset    uint
-	tx        *goqu.TxDatabase
+	hasLimit   bool
+	limit      uint
+	hasOffset  bool
+	offset     uint
+	tx         *goqu.TxDatabase
+	doRollback bool
+	doCommit   bool
 }
 
 // QueryOption defines the signature for functions that can modify a QuerySettings
@@ -99,5 +128,16 @@ func WithQueryOffset(offset uint) QueryOption {
 func WithTX(tx *goqu.TxDatabase) QueryOption {
 	return func(s *QuerySettings) {
 		s.tx = tx
+	}
+}
+
+// WithTXRollbackCommit allows callers to control whether a function can call
+// Rollback() and Commit() on the transaction, or if that should be left up to
+// the caller to manage.
+func WithTXRollbackCommit(tx *goqu.TxDatabase, doRollback, doCommit bool) QueryOption {
+	return func(s *QuerySettings) {
+		s.tx = tx
+		s.doRollback = doRollback
+		s.doCommit = doCommit
 	}
 }

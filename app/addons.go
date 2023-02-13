@@ -45,6 +45,16 @@ func (a *App) sendSubscriptionAddonListResponseError(reply string, log *logrus.E
 	}
 }
 
+func (a *App) sendSubscriptionAddonResponseError(reply string, log *logrus.Entry) func(context.Context, *qms.SubscriptionAddonResponse, error) {
+	return func(ctx context.Context, response *qms.SubscriptionAddonResponse, err error) {
+		log.Error(err)
+		response.Error = serrors.NatsError(ctx, err)
+		if err = a.client.Respond(ctx, reply, response); err != nil {
+			log.Error(err)
+		}
+	}
+}
+
 func (a *App) AddAddonHandler(subject, reply string, request *qms.AddAddonRequest) {
 	var err error
 
@@ -248,6 +258,42 @@ func (a *App) ListSubscriptionAddonsHandler(subject, reply string, request *requ
 	for _, addon := range results {
 		response.SubscriptionAddons = append(response.SubscriptionAddons, addon.ToQMSType())
 	}
+
+	if err = a.client.Respond(ctx, reply, response); err != nil {
+		log.Error(err)
+	}
+}
+
+func (a *App) AddSubscriptionAddonHandler(subject, reply string, request *requests.AssociateByUUIDs) {
+	var err error
+
+	ctx, span := reqinit.InitAssociateByUUIDs(request, subject)
+	defer span.End()
+
+	log := log.WithField("context", "adding subscription add-on")
+	response := qmsinit.NewSubscriptionAddonResponse()
+	sendError := a.sendSubscriptionAddonResponseError(reply, log)
+	d := db.New(a.db)
+
+	subscriptionID := request.ParentUuid
+	if subscriptionID == "" {
+		sendError(ctx, response, errors.New("parent_uuid must be set to the subscription UUID"))
+		return
+	}
+
+	addonID := request.ChildUuid
+	if addonID == "" {
+		sendError(ctx, response, errors.New("child_id must be set to the add-on UUID"))
+		return
+	}
+
+	result, err := d.AddSubscriptionAddon(ctx, subscriptionID, addonID)
+	if err != nil {
+		sendError(ctx, response, err)
+		return
+	}
+
+	response.SubscriptionAddon = result.ToQMSType()
 
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
