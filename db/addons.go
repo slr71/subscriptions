@@ -47,6 +47,24 @@ func addonDS(db GoquDatabase) *goqu.SelectDataset {
 		Join(t.ResourceTypes, goqu.On(t.Addons.Col("resource_type_id").Eq(t.ResourceTypes.Col("id"))))
 }
 
+func (d *Database) GetAddonByID(ctx context.Context, addonID string, opts ...QueryOption) (*Addon, error) {
+	var err error
+	var addonFound bool
+
+	_, db := d.querySettings(opts...)
+
+	addon := &Addon{}
+	addonInfo := addonDS(db).
+		Where(t.Addons.Col("id").Eq(addonID)).
+		Executor()
+
+	if addonFound, err = addonInfo.ScanStructContext(ctx, addon); err != nil || !addonFound {
+		return nil, errors.Wrap(err, "unable to get add-on info")
+	}
+
+	return addon, nil
+}
+
 func (d *Database) ListAddons(ctx context.Context, opts ...QueryOption) ([]Addon, error) {
 	_, db := d.querySettings(opts...)
 
@@ -180,10 +198,8 @@ func (d *Database) DeleteAddon(ctx context.Context, addonID string, opts ...Quer
 	return err
 }
 
-func (d *Database) ListSubscriptionAddons(ctx context.Context, subscriptionID string, opts ...QueryOption) ([]SubscriptionAddon, error) {
-	_, db := d.querySettings(opts...)
-
-	ds := db.From(t.SubscriptionAddons).
+func subAddonDS(db GoquDatabase) *goqu.SelectDataset {
+	return db.From(t.SubscriptionAddons).
 		Select(
 			t.SubscriptionAddons.Col("id"),
 
@@ -218,6 +234,28 @@ func (d *Database) ListSubscriptionAddons(ctx context.Context, subscriptionID st
 		Join(t.ResourceTypes, goqu.On(t.Addons.Col("resource_type_id").Eq(t.ResourceTypes.Col("id")))).
 		Join(t.Users, goqu.On(t.Subscriptions.Col("user_id").Eq(t.Users.Col("id")))).
 		Join(t.Plans, goqu.On(t.Subscriptions.Col("plan_id").Eq(t.Plans.Col("id"))))
+}
+
+func (d *Database) GetSubscriptionAddonByID(ctx context.Context, subAddonID string, opts ...QueryOption) (*SubscriptionAddon, error) {
+	_, db := d.querySettings(opts...)
+
+	ds := subAddonDS(db).
+		Where(t.SubscriptionAddons.Col("id").Eq(subAddonID)).
+		Executor()
+	d.LogSQL(ds)
+
+	subAddon := &SubscriptionAddon{}
+	if _, err := ds.ScanStructContext(ctx, subAddon); err != nil {
+		return nil, err
+	}
+
+	return subAddon, nil
+}
+
+func (d *Database) ListSubscriptionAddons(ctx context.Context, subscriptionID string, opts ...QueryOption) ([]SubscriptionAddon, error) {
+	_, db := d.querySettings(opts...)
+
+	ds := subAddonDS(db).Executor()
 	d.LogSQL(ds)
 
 	var addons []SubscriptionAddon
@@ -238,14 +276,9 @@ func (d *Database) AddSubscriptionAddon(ctx context.Context, subscriptionID, add
 		defer db.Rollback()
 	}
 
-	var addonFound bool
-	addon := &Addon{}
-	addonInfo := addonDS(db).
-		Where(t.Addons.Col("id").Eq(addonID)).
-		Executor()
-
-	if addonFound, err = addonInfo.ScanStructContext(ctx, addon); err != nil || !addonFound {
-		return nil, errors.Wrap(err, "unable to get add-on info")
+	addon, err := d.GetAddonByID(ctx, addonID, WithTXRollbackCommit(db, false, false))
+	if err != nil {
+		return nil, err
 	}
 
 	ds := db.Insert(t.SubscriptionAddons).
@@ -263,7 +296,7 @@ func (d *Database) AddSubscriptionAddon(ctx context.Context, subscriptionID, add
 		return nil, err
 	}
 
-	subscription, err := d.GetSubscriptionByID(ctx, subscriptionID, opts...)
+	subscription, err := d.GetSubscriptionByID(ctx, subscriptionID, WithTXRollbackCommit(db, false, false))
 	if err != nil {
 		return nil, err
 	}
@@ -283,5 +316,16 @@ func (d *Database) AddSubscriptionAddon(ctx context.Context, subscriptionID, add
 	}
 
 	return retval, nil
+}
 
+func (d *Database) DeleteSubscriptionAddon(ctx context.Context, subAddonID string, opts ...QueryOption) error {
+	_, db := d.querySettings(opts...)
+
+	ds := db.From(t.SubscriptionAddons).
+		Delete().
+		Where(t.SubscriptionAddons.Col("id").Eq(subAddonID)).
+		Executor()
+
+	_, err := ds.ExecContext(ctx)
+	return err
 }

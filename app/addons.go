@@ -335,3 +335,86 @@ func (a *App) AddSubscriptionAddonHandler(subject, reply string, request *reques
 		log.Error(err)
 	}
 }
+
+func (a *App) DeleteSubscriptionAddonHandler(subject, reply string, request *requests.ByUUID) {
+	var err error
+
+	ctx, span := reqinit.InitByUUID(request, subject)
+	defer span.End()
+
+	log := log.WithField("context", "deleting subscription add-ons")
+	response := qmsinit.NewSubscriptionAddonResponse()
+	sendError := a.sendSubscriptionAddonResponseError(reply, log)
+	d := db.New(a.db)
+
+	// Get the subscription add-on ID out of the request.
+	subAddonID := request.Uuid
+	if subAddonID == "" {
+		sendError(ctx, response, errors.New("subscription add-on UUID must be set"))
+		return
+	}
+
+	/// Start the database transaction.
+	tx, err := d.Begin()
+	if err != nil {
+		sendError(ctx, response, err)
+		return
+	}
+	defer tx.Rollback()
+
+	// Get the subscription add-on details from the database. Needed to modify
+	// the quota value.
+	subAddon, err := d.GetSubscriptionAddonByID(ctx, subAddonID, db.WithTX(tx))
+	if err != nil {
+		sendError(ctx, response, err)
+		return
+	}
+
+	// Get the current quota value.
+	quotaValue, quotaFound, err := d.GetCurrentQuota(
+		ctx,
+		subAddon.Addon.ResourceType.ID,
+		subAddon.Subscription.ID,
+		db.WithTXRollbackCommit(tx, false, false),
+	)
+	if err != nil {
+		sendError(ctx, response, err)
+		return
+	}
+
+	// Update the quota value by subtracting the amount configured in the
+	// subscription add-on. We don't want the available add-on value, we want
+	// the subscription add-on value, which may have been modified from the
+	// available add-on value.
+	quotaValue = quotaValue - subAddon.Amount
+	if err = d.UpsertQuota(
+		ctx,
+		quotaFound,
+		quotaValue,
+		subAddon.Addon.ResourceType.ID,
+		subAddon.Subscription.ID,
+		db.WithTXRollbackCommit(tx, false, false),
+	); err != nil {
+		sendError(ctx, response, err)
+		return
+	}
+
+	// Delete the subscription add-on.
+	if err = d.DeleteSubscriptionAddon(ctx, subAddonID, db.WithTX(tx)); err != nil {
+		sendError(ctx, response, err)
+		return
+	}
+
+	// Commit all of the changes.
+	if err = tx.Commit(); err != nil {
+		sendError(ctx, response, err)
+		return
+	}
+
+	// Return the response.
+	response.SubscriptionAddon = subAddon.ToQMSType()
+
+	if err = a.client.Respond(ctx, reply, response); err != nil {
+		log.Error(err)
+	}
+}
