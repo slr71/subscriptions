@@ -418,3 +418,34 @@ func (a *App) DeleteSubscriptionAddonHandler(subject, reply string, request *req
 		log.Error(err)
 	}
 }
+
+func (a *App) UpdateSubscriptionAddonHandler(subject, reply string, request *qms.UpdateSubscriptionAddonRequest) {
+	var err error
+
+	ctx, span := qmsinit.InitUpdateSubscriptionAddonRequest(request, subject)
+	defer span.End()
+
+	log := log.WithField("context", "update subscription addon")
+	response := qmsinit.NewSubscriptionAddonResponse()
+	sendError := a.sendSubscriptionAddonResponseError(reply, log)
+	d := db.New(a.db)
+
+	if request.SubscriptionAddon.Uuid == "" {
+		sendError(ctx, response, errors.New("uuid must be set in the request"))
+		return
+	}
+
+	updateSubAddon := db.NewUpdateSubscriptionAddonFromQMS(request)
+
+	result, err := d.UpdateSubscriptionAddon(ctx, updateSubAddon)
+	if err != nil {
+		sendError(ctx, response, err)
+		return
+	}
+
+	response.SubscriptionAddon = result.ToQMSType()
+
+	if err = a.client.Respond(ctx, reply, response); err != nil {
+		log.Error(err)
+	}
+}

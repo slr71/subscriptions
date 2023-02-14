@@ -329,3 +329,42 @@ func (d *Database) DeleteSubscriptionAddon(ctx context.Context, subAddonID strin
 	_, err := ds.ExecContext(ctx)
 	return err
 }
+
+func (d *Database) UpdateSubscriptionAddon(ctx context.Context, updated *UpdateSubscriptionAddon, opts ...QueryOption) (*SubscriptionAddon, error) {
+	_, db := d.querySettings(opts...)
+
+	rec := goqu.Record{}
+
+	if updated.UpdateAddonID {
+		rec["addon_id"] = updated.AddonID
+	}
+	if updated.UpdateAmount {
+		rec["amount"] = updated.Amount
+	}
+	if updated.UpdatePaid {
+		rec["paid"] = updated.Paid
+	}
+	if updated.UpdateSubscriptionID {
+		rec["subscription_id"] = updated.SubscriptionID
+	}
+
+	ds := db.Update(t.SubscriptionAddons).
+		Set(rec).
+		Where(t.SubscriptionAddons.Col("id").Eq(updated.ID)).
+		Returning(
+			t.SubscriptionAddons.Col("id"),
+			t.SubscriptionAddons.Col("addon_id").As(goqu.C("addons.id")),
+			t.SubscriptionAddons.Col("subscription_id").As(goqu.C("subscriptions.id")),
+			t.SubscriptionAddons.Col("amount"),
+			t.SubscriptionAddons.Col("paid"),
+		).
+		Executor()
+
+	retval := &SubscriptionAddon{}
+	_, err := ds.ScanStructContext(ctx, retval)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to scan results of update")
+	}
+
+	return retval, nil
+}

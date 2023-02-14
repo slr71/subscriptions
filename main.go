@@ -171,6 +171,7 @@ func main() {
 		qmssubs.ListSubscriptionAddons:  a.ListSubscriptionAddonsHandler,
 		qmssubs.AddSubscriptionAddon:    a.AddSubscriptionAddonHandler,
 		qmssubs.DeleteSubscriptionAddon: a.DeleteSubscriptionAddonHandler,
+		qmssubs.UpdateSubscriptionAddon: a.UpdateSubscriptionAddonHandler,
 	}
 
 	for subject, handler := range handlers {

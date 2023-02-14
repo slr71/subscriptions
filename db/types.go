@@ -428,3 +428,39 @@ func (sa *SubscriptionAddon) ToQMSType() *qms.SubscriptionAddon {
 		Paid:         sa.Paid,
 	}
 }
+
+type UpdateSubscriptionAddon struct {
+	ID                   string  `db:"id" goqu:"skipupdate`
+	AddonID              string  `db:"addon_id"`
+	UpdateAddonID        bool    `db:"-"`
+	SubscriptionID       string  `db:"subscription_id"`
+	UpdateSubscriptionID bool    `db:"-"`
+	Amount               float64 `db:"amount"`
+	UpdateAmount         bool    `db:"-"`
+	Paid                 bool    `db:"paid"`
+	UpdatePaid           bool    `db:"-"`
+}
+
+func NewUpdateSubscriptionAddonFromQMS(q *qms.UpdateSubscriptionAddonRequest) *UpdateSubscriptionAddon {
+	update := &UpdateSubscriptionAddon{
+		ID:                   q.SubscriptionAddon.Uuid,
+		UpdateAddonID:        q.UpdateAddonId,
+		UpdateSubscriptionID: q.UpdateSubscriptionId,
+		UpdateAmount:         q.UpdateAmount,
+		UpdatePaid:           q.UpdatePaid,
+	}
+
+	if update.UpdateAddonID {
+		update.AddonID = q.SubscriptionAddon.Addon.Uuid
+	}
+	if update.UpdateSubscriptionID {
+		update.SubscriptionID = q.SubscriptionAddon.Subscription.Uuid
+	}
+	if update.UpdateAmount {
+		update.Amount = float64(q.SubscriptionAddon.Amount)
+	}
+	if update.UpdatePaid {
+		update.Paid = q.SubscriptionAddon.Paid
+	}
+	return update
+}
