@@ -331,7 +331,14 @@ func (d *Database) DeleteSubscriptionAddon(ctx context.Context, subAddonID strin
 }
 
 func (d *Database) UpdateSubscriptionAddon(ctx context.Context, updated *UpdateSubscriptionAddon, opts ...QueryOption) (*SubscriptionAddon, error) {
-	_, db := d.querySettings(opts...)
+	qs, db, err := d.querySettingsWithTX(opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	if qs.doRollback {
+		defer db.Rollback()
+	}
 
 	rec := goqu.Record{}
 	if updated.UpdateAmount {
@@ -344,20 +351,41 @@ func (d *Database) UpdateSubscriptionAddon(ctx context.Context, updated *UpdateS
 	ds := db.Update(t.SubscriptionAddons).
 		Set(rec).
 		Where(t.SubscriptionAddons.Col("id").Eq(updated.ID)).
-		Returning(
-			t.SubscriptionAddons.Col("id"),
-			t.SubscriptionAddons.Col("addon_id").As(goqu.C("addons.id")),
-			t.SubscriptionAddons.Col("subscription_id").As(goqu.C("subscriptions.id")),
-			t.SubscriptionAddons.Col("amount"),
-			t.SubscriptionAddons.Col("paid"),
-		).
 		Executor()
 
-	retval := &SubscriptionAddon{}
-	_, err := ds.ScanStructContext(ctx, retval)
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to scan results of update")
+	if _, err = ds.ExecContext(ctx); err != nil {
+		return nil, err
 	}
+
+	retval, err := d.GetSubscriptionAddonByID(ctx, updated.ID, WithTXRollbackCommit(db, false, false))
+	if err != nil {
+		return nil, err
+	}
+
+	usages, err := d.SubscriptionUsages(ctx, retval.Subscription.ID, WithTXRollbackCommit(db, false, false))
+	if err != nil {
+		return nil, err
+	}
+
+	quotas, err := d.SubscriptionQuotas(ctx, retval.Subscription.ID, WithTXRollbackCommit(db, false, false))
+	if err != nil {
+		return nil, err
+	}
+
+	pqd, err := d.SubscriptionQuotaDefaults(ctx, retval.Subscription.Plan.ID, WithTXRollbackCommit(db, false, false))
+	if err != nil {
+		return nil, err
+	}
+
+	if qs.doCommit {
+		if err = db.Commit(); err != nil {
+			return nil, err
+		}
+	}
+
+	retval.Subscription.Usages = usages
+	retval.Subscription.Quotas = quotas
+	retval.Subscription.Plan.QuotaDefaults = pqd
 
 	return retval, nil
 }

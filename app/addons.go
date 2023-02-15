@@ -458,7 +458,7 @@ func (a *App) UpdateSubscriptionAddonHandler(subject, reply string, request *qms
 		// Get the current quota value.
 		quotaValue, quotaFound, err := d.GetCurrentQuota(
 			ctx,
-			preUpdateSubAddon.ID,
+			preUpdateSubAddon.Addon.ResourceType.ID,
 			preUpdateSubAddon.Subscription.ID,
 			db.WithTXRollbackCommit(tx, false, false),
 		)
@@ -488,7 +488,7 @@ func (a *App) UpdateSubscriptionAddonHandler(subject, reply string, request *qms
 		}
 	}
 
-	result, err := d.UpdateSubscriptionAddon(ctx, updateSubAddon, db.WithTX(tx))
+	result, err := d.UpdateSubscriptionAddon(ctx, updateSubAddon, db.WithTXRollbackCommit(tx, false, false))
 	if err != nil {
 		sendError(ctx, response, err)
 		return
