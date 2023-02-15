@@ -334,18 +334,11 @@ func (d *Database) UpdateSubscriptionAddon(ctx context.Context, updated *UpdateS
 	_, db := d.querySettings(opts...)
 
 	rec := goqu.Record{}
-
-	if updated.UpdateAddonID {
-		rec["addon_id"] = updated.AddonID
-	}
 	if updated.UpdateAmount {
 		rec["amount"] = updated.Amount
 	}
 	if updated.UpdatePaid {
 		rec["paid"] = updated.Paid
-	}
-	if updated.UpdateSubscriptionID {
-		rec["subscription_id"] = updated.SubscriptionID
 	}
 
 	ds := db.Update(t.SubscriptionAddons).

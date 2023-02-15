@@ -435,10 +435,66 @@ func (a *App) UpdateSubscriptionAddonHandler(subject, reply string, request *qms
 		return
 	}
 
+	subAddonID := request.SubscriptionAddon.Uuid
 	updateSubAddon := db.NewUpdateSubscriptionAddonFromQMS(request)
 
-	result, err := d.UpdateSubscriptionAddon(ctx, updateSubAddon)
+	/// Start the database transaction.
+	tx, err := d.Begin()
 	if err != nil {
+		sendError(ctx, response, err)
+		return
+	}
+	defer tx.Rollback()
+
+	if updateSubAddon.UpdateAmount {
+		// Get the pre-update subscription add-on details from the database. Needed
+		// to modify the quota value.
+		preUpdateSubAddon, err := d.GetSubscriptionAddonByID(ctx, subAddonID, db.WithTX(tx))
+		if err != nil {
+			sendError(ctx, response, err)
+			return
+		}
+
+		// Get the current quota value.
+		quotaValue, quotaFound, err := d.GetCurrentQuota(
+			ctx,
+			preUpdateSubAddon.ID,
+			preUpdateSubAddon.Subscription.ID,
+			db.WithTXRollbackCommit(tx, false, false),
+		)
+		if err != nil {
+			sendError(ctx, response, err)
+			return
+		}
+
+		// First, remove the pre-update subscription add-on value from the quota
+		// value.
+		quotaValue = quotaValue - preUpdateSubAddon.Amount
+
+		// Next, add the new value for the subscription add-on.
+		quotaValue = quotaValue + updateSubAddon.Amount
+
+		// Now update the quota value
+		if err = d.UpsertQuota(
+			ctx,
+			quotaFound,
+			quotaValue,
+			preUpdateSubAddon.Addon.ResourceType.ID,
+			preUpdateSubAddon.Subscription.ID,
+			db.WithTXRollbackCommit(tx, false, false),
+		); err != nil {
+			sendError(ctx, response, err)
+			return
+		}
+	}
+
+	result, err := d.UpdateSubscriptionAddon(ctx, updateSubAddon, db.WithTX(tx))
+	if err != nil {
+		sendError(ctx, response, err)
+		return
+	}
+
+	if err = tx.Commit(); err != nil {
 		sendError(ctx, response, err)
 		return
 	}

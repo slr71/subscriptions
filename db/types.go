@@ -441,6 +441,9 @@ type UpdateSubscriptionAddon struct {
 	UpdatePaid           bool    `db:"-"`
 }
 
+// NewUpdateSubscriptoinAddonFromQMS does what the name implies. A caveat is that
+// The UpdateAddonID and UpdateSubscriptionID fields are ignored by the logic in
+// the service.
 func NewUpdateSubscriptionAddonFromQMS(q *qms.UpdateSubscriptionAddonRequest) *UpdateSubscriptionAddon {
 	update := &UpdateSubscriptionAddon{
 		ID:                   q.SubscriptionAddon.Uuid,
@@ -448,13 +451,6 @@ func NewUpdateSubscriptionAddonFromQMS(q *qms.UpdateSubscriptionAddonRequest) *U
 		UpdateSubscriptionID: q.UpdateSubscriptionId,
 		UpdateAmount:         q.UpdateAmount,
 		UpdatePaid:           q.UpdatePaid,
-	}
-
-	if update.UpdateAddonID {
-		update.AddonID = q.SubscriptionAddon.Addon.Uuid
-	}
-	if update.UpdateSubscriptionID {
-		update.SubscriptionID = q.SubscriptionAddon.Subscription.Uuid
 	}
 	if update.UpdateAmount {
 		update.Amount = float64(q.SubscriptionAddon.Amount)
