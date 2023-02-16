@@ -131,6 +131,34 @@ type Subscription struct {
 	Paid               bool      `db:"paid" goqu:"defaultifempty"`
 }
 
+func NewSubscriptionFromQMS(s *qms.Subscription) *Subscription {
+	var quotas []Quota
+	var usages []Usage
+
+	for _, sq := range s.Quotas {
+		quotas = append(quotas, *NewQuotaFromQMS(sq))
+	}
+	for _, su := range s.Usages {
+		usages = append(usages, *NewUsageFromQMS(su))
+	}
+
+	return &Subscription{
+		ID:                 s.Uuid,
+		EffectiveStartDate: s.EffectiveEndDate.AsTime(),
+		EffectiveEndDate:   s.EffectiveEndDate.AsTime(),
+		User: User{
+			ID:       s.User.Uuid,
+			Username: s.User.Username,
+		},
+		Quotas:         quotas,
+		Usages:         usages,
+		Plan:           *NewPlanFromQMS(s.Plan),
+		CreatedBy:      s.User.Username,
+		LastModifiedBy: s.User.Username,
+		Paid:           s.Paid,
+	}
+}
+
 func (up Subscription) ToQMSSubscription() *qms.Subscription {
 	// Convert the list of quotas.
 	quotas := make([]*qms.Quota, len(up.Quotas))
@@ -163,6 +191,19 @@ type Plan struct {
 	QuotaDefaults []PlanQuotaDefault `db:"-"`
 }
 
+func NewPlanFromQMS(q *qms.Plan) *Plan {
+	pqd := make([]PlanQuotaDefault, 0)
+	for _, qd := range q.PlanQuotaDefaults {
+		pqd = append(pqd, *NewPlanQuotaDefaultFromQMS(qd, q.Uuid))
+	}
+	return &Plan{
+		ID:            q.Uuid,
+		Name:          q.Name,
+		Description:   q.Description,
+		QuotaDefaults: pqd,
+	}
+}
+
 func (p Plan) ToQMSPlan() *qms.Plan {
 	// Convert the quota defaults.
 	quotaDefaults := make([]*qms.QuotaDefault, len(p.QuotaDefaults))
@@ -185,6 +226,15 @@ type PlanQuotaDefault struct {
 	ResourceType ResourceType `db:"resource_types"`
 }
 
+func NewPlanQuotaDefaultFromQMS(q *qms.QuotaDefault, planID string) *PlanQuotaDefault {
+	return &PlanQuotaDefault{
+		ID:           q.Uuid,
+		PlanID:       planID,
+		QuotaValue:   float64(q.QuotaValue),
+		ResourceType: *NewResourceTypeFromQMS(q.ResourceType),
+	}
+}
+
 func (pqd PlanQuotaDefault) ToQMSQuotaDefault() *qms.QuotaDefault {
 	return &qms.QuotaDefault{
 		Uuid:         pqd.ID,
@@ -202,6 +252,19 @@ type Usage struct {
 	CreatedAt      time.Time    `db:"created_at"`
 	LastModifiedBy string       `db:"last_modified_by"`
 	LastModifiedAt time.Time    `db:"last_modified_at"`
+}
+
+func NewUsageFromQMS(q *qms.Usage) *Usage {
+	return &Usage{
+		ID:             q.Uuid,
+		Usage:          q.Usage,
+		SubscriptionID: q.SubscriptionId,
+		ResourceType:   *NewResourceTypeFromQMS(q.ResourceType),
+		CreatedBy:      q.CreatedBy,
+		CreatedAt:      q.CreatedAt.AsTime(),
+		LastModifiedBy: q.LastModifiedBy,
+		LastModifiedAt: q.LastModifiedAt.AsTime(),
+	}
 }
 
 func (u Usage) ToQMSUsage() *qms.Usage {
@@ -225,6 +288,21 @@ type Quota struct {
 	CreatedAt      time.Time    `db:"created_at"`
 	LastModifiedBy string       `db:"last_modified_by"`
 	LastModifiedAt time.Time    `db:"last_modified_at"`
+}
+
+func NewQuotaFromQMS(q *qms.Quota) *Quota {
+	return &Quota{
+		ID:           q.Uuid,
+		Quota:        float64(q.Quota),
+		ResourceType: *NewResourceTypeFromQMS(q.ResourceType),
+		Subscription: Subscription{
+			ID: q.SubscriptionId,
+		},
+		CreatedBy:      q.CreatedBy,
+		CreatedAt:      q.CreatedAt.AsTime(),
+		LastModifiedBy: q.LastModifiedBy,
+		LastModifiedAt: q.LastModifiedAt.AsTime(),
+	}
 }
 
 func (q Quota) ToQMSQuota() *qms.Quota {
@@ -319,6 +397,66 @@ func NewUpdateAddonFromQMS(u *qms.UpdateAddonRequest) *UpdateAddon {
 	}
 	if update.UpdateResourceType {
 		update.ResourceTypeID = u.Addon.ResourceType.Uuid
+	}
+	return update
+}
+
+type SubscriptionAddon struct {
+	ID           string       `db:"id" goqu:"defaultifempty,skipupdate"`
+	Addon        Addon        `db:"addons"`
+	Subscription Subscription `db:"subscriptions"`
+	Amount       float64      `db:"amount"`
+	Paid         bool         `db:"paid"`
+}
+
+func NewSubscriptionAddonFromQMS(sa *qms.SubscriptionAddon) *SubscriptionAddon {
+	return &SubscriptionAddon{
+		ID:           sa.Uuid,
+		Addon:        *NewAddonFromQMS(sa.Addon),
+		Subscription: *NewSubscriptionFromQMS(sa.Subscription),
+		Amount:       float64(sa.Amount),
+		Paid:         sa.Paid,
+	}
+}
+
+func (sa *SubscriptionAddon) ToQMSType() *qms.SubscriptionAddon {
+	return &qms.SubscriptionAddon{
+		Uuid:         sa.ID,
+		Addon:        sa.Addon.ToQMSType(),
+		Subscription: sa.Subscription.ToQMSSubscription(),
+		Amount:       float32(sa.Amount),
+		Paid:         sa.Paid,
+	}
+}
+
+type UpdateSubscriptionAddon struct {
+	ID                   string  `db:"id" goqu:"skipupdate`
+	AddonID              string  `db:"addon_id"`
+	UpdateAddonID        bool    `db:"-"`
+	SubscriptionID       string  `db:"subscription_id"`
+	UpdateSubscriptionID bool    `db:"-"`
+	Amount               float64 `db:"amount"`
+	UpdateAmount         bool    `db:"-"`
+	Paid                 bool    `db:"paid"`
+	UpdatePaid           bool    `db:"-"`
+}
+
+// NewUpdateSubscriptoinAddonFromQMS does what the name implies. A caveat is that
+// The UpdateAddonID and UpdateSubscriptionID fields are ignored by the logic in
+// the service.
+func NewUpdateSubscriptionAddonFromQMS(q *qms.UpdateSubscriptionAddonRequest) *UpdateSubscriptionAddon {
+	update := &UpdateSubscriptionAddon{
+		ID:                   q.SubscriptionAddon.Uuid,
+		UpdateAddonID:        q.UpdateAddonId,
+		UpdateSubscriptionID: q.UpdateSubscriptionId,
+		UpdateAmount:         q.UpdateAmount,
+		UpdatePaid:           q.UpdatePaid,
+	}
+	if update.UpdateAmount {
+		update.Amount = float64(q.SubscriptionAddon.Amount)
+	}
+	if update.UpdatePaid {
+		update.Paid = q.SubscriptionAddon.Paid
 	}
 	return update
 }
