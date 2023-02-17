@@ -264,6 +264,31 @@ func (a *App) ListSubscriptionAddonsHandler(subject, reply string, request *requ
 	}
 }
 
+// GetSubscriptionAddonHandler gets a single addon based on it's UUID.
+func (a *App) GetSubscriptionAddonHandler(subject, reply string, request *requests.ByUUID) {
+	var err error
+
+	ctx, span := reqinit.InitByUUID(request, subject)
+	defer span.End()
+
+	log := log.WithField("context", "getting subscription add-on")
+	response := qmsinit.NewSubscriptionAddonResponse()
+	sendError := a.sendSubscriptionAddonResponseError(reply, log)
+	d := db.New(a.db)
+
+	subAddon, err := d.GetSubscriptionAddonByID(ctx, request.Uuid)
+	if err != nil {
+		sendError(ctx, response, err)
+		return
+	}
+
+	response.SubscriptionAddon = subAddon.ToQMSType()
+
+	if err = a.client.Respond(ctx, reply, response); err != nil {
+		log.Error(err)
+	}
+}
+
 func (a *App) AddSubscriptionAddonHandler(subject, reply string, request *requests.AssociateByUUIDs) {
 	var err error
 
