@@ -59,6 +59,10 @@ func NatsStatusCode(err error) svcerror.ErrorCode {
 	switch err {
 	case ErrUserNotFound:
 		return svcerror.ErrorCode_NOT_FOUND
+	case ErrAddonNotFound:
+		return svcerror.ErrorCode_NOT_FOUND
+	case ErrSubAddonNotFound:
+		return svcerror.ErrorCode_NOT_FOUND
 	case ErrInvalidUsername:
 		return svcerror.ErrorCode_BAD_REQUEST
 	case ErrInvalidResourceName:
