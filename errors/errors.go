@@ -20,6 +20,8 @@ var (
 	ErrInvalidValueType     = errors.New("invalid value type")
 	ErrInvalidValue         = errors.New("invalid value")
 	ErrInvalidEffectiveDate = errors.New("invalid effective date")
+	ErrAddonNotFound        = errors.New("add-on not found")
+	ErrSubAddonNotFound     = errors.New("subscription add-on not found")
 )
 
 func HTTPStatusCode(err error) int {
@@ -44,6 +46,10 @@ func HTTPStatusCode(err error) int {
 		return http.StatusBadRequest
 	case ErrInvalidEffectiveDate:
 		return http.StatusBadRequest
+	case ErrAddonNotFound:
+		return http.StatusNotFound
+	case ErrSubAddonNotFound:
+		return http.StatusNotFound
 	default:
 		return http.StatusInternalServerError
 	}

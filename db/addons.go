@@ -4,6 +4,7 @@ import (
 	"context"
 
 	t "github.com/cyverse-de/subscriptions/db/tables"
+	suberrors "github.com/cyverse-de/subscriptions/errors"
 	"github.com/doug-martin/goqu/v9"
 	"github.com/pkg/errors"
 )
@@ -178,9 +179,13 @@ func (d *Database) UpdateAddon(ctx context.Context, updatedAddon *UpdateAddon, o
 		Executor()
 
 	retval := &Addon{}
-	_, err := ds.ScanStructContext(ctx, retval)
+	found, err := ds.ScanStructContext(ctx, retval)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to scan results of update")
+	}
+
+	if !found {
+		return nil, suberrors.ErrAddonNotFound
 	}
 
 	return retval, nil
@@ -245,8 +250,13 @@ func (d *Database) GetSubscriptionAddonByID(ctx context.Context, subAddonID stri
 	d.LogSQL(ds)
 
 	subAddon := &SubscriptionAddon{}
-	if _, err := ds.ScanStructContext(ctx, subAddon); err != nil {
+	found, err := ds.ScanStructContext(ctx, subAddon)
+	if err != nil {
 		return nil, err
+	}
+
+	if !found {
+		return nil, suberrors.ErrSubAddonNotFound
 	}
 
 	return subAddon, nil
@@ -351,10 +361,17 @@ func (d *Database) UpdateSubscriptionAddon(ctx context.Context, updated *UpdateS
 	ds := db.Update(t.SubscriptionAddons).
 		Set(rec).
 		Where(t.SubscriptionAddons.Col("id").Eq(updated.ID)).
+		Returning(t.SubscriptionAddons.Col("id")).
 		Executor()
 
-	if _, err = ds.ExecContext(ctx); err != nil {
+	var id string
+	found, err := ds.ScanValContext(ctx, &id)
+	if err != nil {
 		return nil, err
+	}
+
+	if !found {
+		return nil, suberrors.ErrSubAddonNotFound
 	}
 
 	retval, err := d.GetSubscriptionAddonByID(ctx, updated.ID, WithTXRollbackCommit(db, false, false))
