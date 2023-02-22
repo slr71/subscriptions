@@ -222,6 +222,17 @@ func (a *App) DeleteAddonHandler(subject, reply string, request *requests.ByUUID
 
 	d := db.New(a.db)
 
+	subAddons, err := d.ListSubscriptionAddonsByAddonID(ctx, request.Uuid)
+	if err != nil {
+		sendError(ctx, response, err)
+		return
+	}
+
+	if len(subAddons) > 0 {
+		sendError(ctx, response, serrors.ErrSubscriptionAddonsExist)
+		return
+	}
+
 	if err = d.DeleteAddon(ctx, request.Uuid); err != nil {
 		sendError(ctx, response, err)
 		return

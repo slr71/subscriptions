@@ -406,3 +406,19 @@ func (d *Database) UpdateSubscriptionAddon(ctx context.Context, updated *UpdateS
 
 	return retval, nil
 }
+
+func (d *Database) ListSubscriptionAddonsByAddonID(ctx context.Context, addonID string, opts ...QueryOption) ([]SubscriptionAddon, error) {
+	_, db := d.querySettings(opts...)
+
+	ds := subAddonDS(db).
+		Where(t.Addons.Col("id").Eq(addonID)).
+		Executor()
+	d.LogSQL(ds)
+
+	var addons []SubscriptionAddon
+	if err := ds.ScanStructsContext(ctx, &addons); err != nil {
+		return nil, errors.Wrap(err, "unable to list addons")
+	}
+
+	return addons, nil
+}
