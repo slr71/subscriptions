@@ -381,8 +381,9 @@ func NewUpdateAddonFromQMS(u *qms.UpdateAddonRequest) *UpdateAddon {
 		UpdateDescription:   u.UpdateDescription,
 		UpdateResourceType:  u.UpdateResourceType,
 		UpdateDefaultAmount: u.UpdateDefaultAmount,
-		UpdateDefaultPaid:   u.UpdateDefaultAmount,
+		UpdateDefaultPaid:   u.UpdateDefaultPaid,
 	}
+
 	if update.UpdateName {
 		update.Name = u.Addon.Name
 	}
