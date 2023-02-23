@@ -265,7 +265,9 @@ func (d *Database) GetSubscriptionAddonByID(ctx context.Context, subAddonID stri
 func (d *Database) ListSubscriptionAddons(ctx context.Context, subscriptionID string, opts ...QueryOption) ([]SubscriptionAddon, error) {
 	_, db := d.querySettings(opts...)
 
-	ds := subAddonDS(db).Executor()
+	ds := subAddonDS(db).
+		Where(t.Subscriptions.Col("id").Eq(subscriptionID)).
+		Executor()
 	d.LogSQL(ds)
 
 	var addons []SubscriptionAddon
