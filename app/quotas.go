@@ -49,7 +49,7 @@ func (a *App) AddQuotaHandler(subject, reply string, request *qms.AddQuotaReques
 	}
 
 	response.Quota = &qms.Quota{
-		Quota:          float32(value),
+		Quota:          value,
 		ResourceType:   request.Quota.ResourceType,
 		SubscriptionId: subscriptionID,
 	}

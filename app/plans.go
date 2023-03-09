@@ -54,7 +54,7 @@ func (a *App) ListPlansHandler(subject, reply string, request *qms.NoParamsReque
 		for _, q := range p.QuotaDefaults {
 			newP.PlanQuotaDefaults = append(newP.PlanQuotaDefaults, &qms.QuotaDefault{
 				Uuid:       q.ID,
-				QuotaValue: float32(q.QuotaValue),
+				QuotaValue: q.QuotaValue,
 				ResourceType: &qms.ResourceType{
 					Uuid: q.ResourceType.ID,
 					Name: q.ResourceType.Name,
@@ -153,7 +153,7 @@ func (a *App) GetPlanHandler(subject, reply string, request *qms.PlanRequest) {
 			response.Plan.PlanQuotaDefaults,
 			&qms.QuotaDefault{
 				Uuid:       q.ID,
-				QuotaValue: float32(q.QuotaValue),
+				QuotaValue: q.QuotaValue,
 				ResourceType: &qms.ResourceType{
 					Uuid: q.ResourceType.ID,
 					Name: q.ResourceType.Name,

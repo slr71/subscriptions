@@ -230,7 +230,7 @@ func NewPlanQuotaDefaultFromQMS(q *qms.QuotaDefault, planID string) *PlanQuotaDe
 	return &PlanQuotaDefault{
 		ID:           q.Uuid,
 		PlanID:       planID,
-		QuotaValue:   float64(q.QuotaValue),
+		QuotaValue:   q.QuotaValue,
 		ResourceType: *NewResourceTypeFromQMS(q.ResourceType),
 	}
 }
@@ -238,7 +238,7 @@ func NewPlanQuotaDefaultFromQMS(q *qms.QuotaDefault, planID string) *PlanQuotaDe
 func (pqd PlanQuotaDefault) ToQMSQuotaDefault() *qms.QuotaDefault {
 	return &qms.QuotaDefault{
 		Uuid:         pqd.ID,
-		QuotaValue:   float32(pqd.QuotaValue),
+		QuotaValue:   pqd.QuotaValue,
 		ResourceType: pqd.ResourceType.ToQMSResourceType(),
 	}
 }
@@ -293,7 +293,7 @@ type Quota struct {
 func NewQuotaFromQMS(q *qms.Quota) *Quota {
 	return &Quota{
 		ID:           q.Uuid,
-		Quota:        float64(q.Quota),
+		Quota:        q.Quota,
 		ResourceType: *NewResourceTypeFromQMS(q.ResourceType),
 		Subscription: Subscription{
 			ID: q.SubscriptionId,
@@ -308,7 +308,7 @@ func NewQuotaFromQMS(q *qms.Quota) *Quota {
 func (q Quota) ToQMSQuota() *qms.Quota {
 	return &qms.Quota{
 		Uuid:           q.ID,
-		Quota:          float32(q.Quota),
+		Quota:          q.Quota,
 		ResourceType:   q.ResourceType.ToQMSResourceType(),
 		CreatedBy:      q.CreatedBy,
 		CreatedAt:      timestamppb.New(q.CreatedAt),
@@ -339,7 +339,7 @@ func NewAddonFromQMS(q *qms.Addon) *Addon {
 	return &Addon{
 		Name:          q.Name,
 		Description:   q.Description,
-		DefaultAmount: float64(q.DefaultAmount),
+		DefaultAmount: q.DefaultAmount,
 		DefaultPaid:   q.DefaultPaid,
 		ResourceType:  *NewResourceTypeFromQMS(q.ResourceType),
 	}
@@ -350,7 +350,7 @@ func (a *Addon) ToQMSType() *qms.Addon {
 		Uuid:          a.ID,
 		Name:          a.Name,
 		Description:   a.Description,
-		DefaultAmount: float32(a.DefaultAmount),
+		DefaultAmount: a.DefaultAmount,
 		DefaultPaid:   a.DefaultPaid,
 		ResourceType: &qms.ResourceType{
 			Uuid: a.ResourceType.ID,
@@ -425,7 +425,7 @@ func (sa *SubscriptionAddon) ToQMSType() *qms.SubscriptionAddon {
 		Uuid:         sa.ID,
 		Addon:        sa.Addon.ToQMSType(),
 		Subscription: sa.Subscription.ToQMSSubscription(),
-		Amount:       float32(sa.Amount),
+		Amount:       sa.Amount,
 		Paid:         sa.Paid,
 	}
 }

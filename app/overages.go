@@ -59,8 +59,8 @@ func (a *App) GetUserOverages(subject, reply string, request *qms.AllUserOverage
 		if usage >= quota {
 			response.Overages = append(response.Overages, &qms.Overage{
 				ResourceName: r.ResourceType.Name,
-				Quota:        float32(quota),
-				Usage:        float32(usage),
+				Quota:        quota,
+				Usage:        usage,
 			})
 		}
 	}
