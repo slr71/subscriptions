@@ -431,7 +431,7 @@ func (sa *SubscriptionAddon) ToQMSType() *qms.SubscriptionAddon {
 }
 
 type UpdateSubscriptionAddon struct {
-	ID                   string  `db:"id" goqu:"skipupdate`
+	ID                   string  `db:"id" goqu:"skipupdate"`
 	AddonID              string  `db:"addon_id"`
 	UpdateAddonID        bool    `db:"-"`
 	SubscriptionID       string  `db:"subscription_id"`

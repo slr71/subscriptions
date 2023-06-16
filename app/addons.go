@@ -95,7 +95,11 @@ func (a *App) AddAddonHandler(subject, reply string, request *qms.AddAddonReques
 		sendError(ctx, response, err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err := tx.Rollback(); err != nil {
+			log.Errorf("unable to roll back the transaction: %s", err)
+		}
+	}()
 
 	if reqAddon.ResourceType.Name != "" && reqAddon.ResourceType.Uuid == "" {
 		lookupRT, err = d.GetResourceTypeByName(ctx, reqAddon.ResourceType.Name, db.WithTX(tx))
@@ -328,7 +332,11 @@ func (a *App) AddSubscriptionAddonHandler(subject, reply string, request *reques
 		sendError(ctx, response, err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err := tx.Rollback(); err != nil {
+			log.Errorf("unable to roll back the transaction: %s", err)
+		}
+	}()
 
 	subAddon, err := d.AddSubscriptionAddon(ctx, subscriptionID, addonID, db.WithTXRollbackCommit(tx, false, false))
 	if err != nil {
@@ -396,7 +404,11 @@ func (a *App) DeleteSubscriptionAddonHandler(subject, reply string, request *req
 		sendError(ctx, response, err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err := tx.Rollback(); err != nil {
+			log.Errorf("unable to roll back the transaction: %s", err)
+		}
+	}()
 
 	// Get the subscription add-on details from the database. Needed to modify
 	// the quota value.
@@ -480,7 +492,11 @@ func (a *App) UpdateSubscriptionAddonHandler(subject, reply string, request *qms
 		sendError(ctx, response, err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err := tx.Rollback(); err != nil {
+			log.Errorf("unable to roll back the transaction: %s", err)
+		}
+	}()
 
 	if updateSubAddon.UpdateAmount {
 		// Get the pre-update subscription add-on details from the database. Needed
