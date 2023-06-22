@@ -97,7 +97,11 @@ func (d *Database) ToggleAddonPaid(ctx context.Context, addonID string, opts ...
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err := tx.Rollback(); err != nil {
+			log.Errorf("unable to roll back the transaction: %s", err)
+		}
+	}()
 
 	opts = append(opts, WithTX(tx))
 
@@ -285,7 +289,11 @@ func (d *Database) AddSubscriptionAddon(ctx context.Context, subscriptionID, add
 	}
 
 	if qs.doRollback {
-		defer db.Rollback()
+		defer func() {
+			if err := db.Rollback(); err != nil {
+				log.Errorf("unable to roll back the transaction: %s", err)
+			}
+		}()
 	}
 
 	addon, err := d.GetAddonByID(ctx, addonID, WithTXRollbackCommit(db, false, false))
@@ -349,7 +357,11 @@ func (d *Database) UpdateSubscriptionAddon(ctx context.Context, updated *UpdateS
 	}
 
 	if qs.doRollback {
-		defer db.Rollback()
+		defer func() {
+			if err := db.Rollback(); err != nil {
+				log.Errorf("unable to roll back the transaction: %s", err)
+			}
+		}()
 	}
 
 	rec := goqu.Record{}
