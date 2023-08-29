@@ -140,6 +140,38 @@ func (d *Database) ProcessUpdateForUsage(ctx context.Context, update *Update) er
 		}
 		log.Debugf("after getting active user plan %s", subscription.ID)
 
+		// create a subscription if there isn't one
+		if subscription == nil || subscription.ID == "" {
+			user, err := d.EnsureUser(ctx, update.User.Username, WithTX(tx))
+			if err != nil {
+				log.Errorf("unable to ensure that the user exists in the database: %s", err)
+				return err
+			}
+
+			plan, err := d.GetPlanByName(ctx, DefaultPlanName, WithTX(tx))
+			if err != nil {
+				log.Errorf("unable to look up the default plan: %s", err)
+				return err
+			}
+
+			subscriptionID, err := d.SetActiveSubscription(ctx, user.ID, plan.ID, false, WithTX(tx))
+			if err != nil {
+				log.Errorf("unable to subscribe the user to the default plan: %s", err)
+				return err
+			}
+
+			subscription, err = d.GetSubscriptionByID(ctx, subscriptionID, WithTX(tx))
+			if err != nil {
+				log.Errorf("unable to look up the new user plan: %s", err)
+				return err
+			}
+			if subscription == nil {
+				err = fmt.Errorf("the newly inserted user plan could not be found")
+				log.Error(err)
+				return err
+			}
+		}
+
 		log.Debug("getting current usage")
 		usageValue, usageFound, err := d.GetCurrentUsage(ctx, update.ResourceType.ID, subscription.ID, WithTX(tx))
 		if err != nil {
