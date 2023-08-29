@@ -141,7 +141,7 @@ func (d *Database) ProcessUpdateForUsage(ctx context.Context, update *Update) er
 		log.Debugf("after getting active user plan %s", subscription.ID)
 
 		// create a subscription if there isn't one
-		if subscription == nil || subscription.ID == "" {
+		if subscription.ID == "" {
 			user, err := d.EnsureUser(ctx, update.User.Username, WithTX(tx))
 			if err != nil {
 				log.Errorf("unable to ensure that the user exists in the database: %s", err)
