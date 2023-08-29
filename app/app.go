@@ -180,11 +180,12 @@ func (a *App) AddUserUpdateHandler(subject, reply string, request *qms.AddUpdate
 	// Get the userID if it's not provided
 	if request.Update.User.Uuid == "" {
 		log.Infof("getting user ID for %s", username)
-		userID, err = d.GetUserID(ctx, username)
+		user, err := d.EnsureUser(ctx, username)
 		if err != nil {
 			sendError(ctx, response, err)
 			return
 		}
+		userID = user.ID
 		log.Infof("user ID for %s is %s", username, userID)
 	} else {
 		userID = request.Update.User.Uuid
