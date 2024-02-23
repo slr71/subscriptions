@@ -235,6 +235,7 @@ func (d *Database) SubscriptionUsages(ctx context.Context, subscriptionID string
 			t.RT.Col("id").As(goqu.C("resource_types.id")),
 			t.RT.Col("name").As(goqu.C("resource_types.name")),
 			t.RT.Col("unit").As(goqu.C("resource_types.unit")),
+			t.RT.Col("consumable").As(goqu.C("resource_types.consumable")),
 		).
 		Join(t.RT, goqu.On(goqu.I("usages.resource_type_id").Eq(goqu.I("resource_types.id")))).
 		Where(t.Usages.Col("subscription_id").Eq(subscriptionID))
@@ -270,6 +271,7 @@ func (d *Database) SubscriptionQuotas(ctx context.Context, subscriptionID string
 			t.RT.Col("id").As(goqu.C("resource_types.id")),
 			t.RT.Col("name").As(goqu.C("resource_types.name")),
 			t.RT.Col("unit").As(goqu.C("resource_types.unit")),
+			t.RT.Col("consumable").As(goqu.C("resource_types.consumable")),
 		).
 		Join(t.RT, goqu.On(goqu.I("quotas.resource_type_id").Eq(goqu.I("resource_types.id")))).
 		Where(t.Quotas.Col("subscription_id").Eq(subscriptionID))
@@ -302,6 +304,7 @@ func (d *Database) SubscriptionQuotaDefaults(ctx context.Context, planID string,
 			t.RT.Col("id").As(goqu.C("resource_types.id")),
 			t.RT.Col("name").As(goqu.C("resource_types.name")),
 			t.RT.Col("unit").As(goqu.C("resource_types.unit")),
+			t.RT.Col("consumable").As(goqu.C("resource_types.consumable")),
 		).
 		Join(t.RT, goqu.On(goqu.I("plan_quota_defaults.resource_type_id").Eq(goqu.I("resource_types.id")))).
 		Where(t.PQD.Col("plan_id").Eq(planID))

@@ -70,6 +70,7 @@ func (d *Database) GetResourceType(ctx context.Context, id string, opts ...Query
 			t.RT.Col("id"),
 			t.RT.Col("name"),
 			t.RT.Col("unit"),
+			t.RT.Col("consumable"),
 		).
 		Where(t.RT.Col("id").Eq(id)).
 		Executor()
@@ -98,6 +99,7 @@ func (d *Database) GetResourceTypeByName(ctx context.Context, name string, opts 
 			t.RT.Col("id"),
 			t.RT.Col("name"),
 			t.RT.Col("unit"),
+			t.RT.Col("consumable"),
 		).
 		Where(t.RT.Col("name").Eq(name)).
 		Executor()

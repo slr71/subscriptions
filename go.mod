@@ -10,7 +10,7 @@ require (
 	github.com/cyverse-de/go-mod/pbinit v0.1.11
 	github.com/cyverse-de/go-mod/protobufjson v0.0.3
 	github.com/cyverse-de/go-mod/subjects v0.1.4
-	github.com/cyverse-de/p/go/qms v0.1.10
+	github.com/cyverse-de/p/go/qms v0.1.12
 	github.com/cyverse-de/p/go/requests v0.0.3
 	github.com/cyverse-de/p/go/svcerror v0.0.8
 	github.com/doug-martin/goqu/v9 v9.19.0
@@ -41,7 +41,6 @@ require (
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
-	github.com/nats-io/nats-server/v2 v2.9.15 // indirect
 	github.com/nats-io/nkeys v0.4.7 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	go.opentelemetry.io/otel/exporters/jaeger v1.17.0 // indirect
@@ -51,6 +50,5 @@ require (
 	golang.org/x/crypto v0.19.0 // indirect
 	golang.org/x/exp v0.0.0-20240222234643-814bf88cf225 // indirect
 	golang.org/x/sys v0.17.0 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
