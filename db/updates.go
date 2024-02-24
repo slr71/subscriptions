@@ -154,7 +154,8 @@ func (d *Database) ProcessUpdateForUsage(ctx context.Context, update *Update) er
 				return err
 			}
 
-			subscriptionID, err := d.SetActiveSubscription(ctx, user.ID, plan.ID, false, WithTX(tx))
+			opts := DefaultSubscriptionOptions()
+			subscriptionID, err := d.SetActiveSubscription(ctx, user.ID, plan, opts, WithTX(tx))
 			if err != nil {
 				log.Errorf("unable to subscribe the user to the default plan: %s", err)
 				return err

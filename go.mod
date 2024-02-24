@@ -2,6 +2,8 @@ module github.com/cyverse-de/subscriptions
 
 go 1.18
 
+replace github.com/cyverse-de/p/go/qms => /Users/sarahr/src/de/libs/p/go/qms
+
 require (
 	github.com/cyverse-de/go-mod/cfg v0.0.1
 	github.com/cyverse-de/go-mod/gotelnats v0.0.11

@@ -7,6 +7,7 @@ import (
 	"github.com/cyverse-de/p/go/qms"
 	"github.com/cyverse-de/subscriptions/db"
 	"github.com/cyverse-de/subscriptions/errors"
+	"github.com/cyverse-de/subscriptions/utils"
 	"github.com/sirupsen/logrus"
 )
 
@@ -38,7 +39,20 @@ func (a *App) AddUserHandler(subject, reply string, request *qms.AddUserRequest)
 
 	d := db.New(a.db)
 
-	log = log.WithFields(logrus.Fields{"user": username})
+	opts, err := utils.OptsForValues(request.Paid, request.Periods, request.EndDate)
+	if err != nil {
+		sendError(ctx, response, err)
+		return
+	}
+	log = log.WithFields(
+		logrus.Fields{
+			"user":     username,
+			"plan":     request.PlanName,
+			"paid":     opts.Paid,
+			"periods":  opts.Periods,
+			"end_date": opts.EndDate,
+		},
+	)
 
 	tx, err := d.Begin()
 	if err != nil {
@@ -51,7 +65,6 @@ func (a *App) AddUserHandler(subject, reply string, request *qms.AddUserRequest)
 
 	// extract information about the subscription from the request
 	planName := request.PlanName
-	paid := request.Paid
 
 	plan, err := d.GetPlanByName(ctx, planName, db.WithTX(tx))
 	if err != nil {
@@ -92,7 +105,7 @@ func (a *App) AddUserHandler(subject, reply string, request *qms.AddUserRequest)
 
 	if !hasPlan {
 		// If the user isn't on a plan, put them on one.
-		if _, err = d.SetActiveSubscription(ctx, userID, plan.ID, paid, db.WithTX(tx)); err != nil {
+		if _, err = d.SetActiveSubscription(ctx, userID, plan, opts, db.WithTX(tx)); err != nil {
 			sendError(ctx, response, err)
 			return
 		}
@@ -107,7 +120,7 @@ func (a *App) AddUserHandler(subject, reply string, request *qms.AddUserRequest)
 
 		// If the user isn't on the plan contained in the request, put them on it.
 		if !onPlan {
-			if _, err = d.SetActiveSubscription(ctx, userID, plan.ID, paid, db.WithTX(tx)); err != nil {
+			if _, err = d.SetActiveSubscription(ctx, userID, plan, opts, db.WithTX(tx)); err != nil {
 				sendError(ctx, response, err)
 				return
 			}
