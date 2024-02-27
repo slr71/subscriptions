@@ -30,7 +30,8 @@ by putting a copy of the configuration file at that path or by specifying the pa
 
 A dotenv file can also be used to specify configuration settings. This file can be used to set environment variables
 in the format `QMS_SOME_CONFIGURATION_SETTING`, for example `QMS_DATABASE_URI`. The default path for the dotenv file
-is `/etc/cyverse/de/env/service.env`. You can also specify a different path using the `--dotenv` command-line option.
+is `/etc/cyverse/de/env/service.env`. You can also specify a different path using the `--dotenv-path` command-line
+option.
 
 The final way that you can specify configuration settings is by setting environment variables in your shell before
 starting the service.
@@ -58,7 +59,7 @@ local NATS cluster, a command like this should work:
 
 ```
 $ make
-$ ./subscriptions --no-tls --no-creds --dotenv dotenv
+$ ./subscriptions --no-tls --no-creds --dotenv-path dotenv
 ```
 
 ### Subscribing to Responses
