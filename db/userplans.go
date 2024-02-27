@@ -137,7 +137,7 @@ func (d *Database) SetActiveSubscription(
 
 	// Add the quota defaults as the t.Quotas for the user plan.
 	for _, quotaDefault := range plan.QuotaDefaults {
-		quotaValue := quotaDefault.QuotaValue
+		quotaValue := quotaDefault.QuotaValue * float64(subscriptionOpts.Periods)
 		if quotaDefault.ResourceType.Consumable {
 			quotaValue *= float64(subscriptionOpts.Periods)
 		}
