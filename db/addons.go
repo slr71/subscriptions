@@ -98,9 +98,7 @@ func (d *Database) ToggleAddonPaid(ctx context.Context, addonID string, opts ...
 		return nil, err
 	}
 	defer func() {
-		if err := tx.Rollback(); err != nil {
-			log.Errorf("unable to roll back the transaction: %s", err)
-		}
+		_ = tx.Rollback()
 	}()
 
 	opts = append(opts, WithTX(tx))
