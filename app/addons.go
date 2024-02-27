@@ -344,7 +344,7 @@ func (a *App) AddSubscriptionAddonHandler(subject, reply string, request *reques
 		return
 	}
 
-	quotaValue, quotaFound, err := d.GetCurrentQuota(
+	quotaValue, _, err := d.GetCurrentQuota(
 		ctx,
 		subAddon.Addon.ResourceType.ID,
 		subscriptionID,
@@ -358,7 +358,6 @@ func (a *App) AddSubscriptionAddonHandler(subject, reply string, request *reques
 	quotaValue = quotaValue + subAddon.Amount
 	if err = d.UpsertQuota(
 		ctx,
-		quotaFound,
 		quotaValue,
 		subAddon.Addon.ResourceType.ID,
 		subscriptionID,
@@ -419,7 +418,7 @@ func (a *App) DeleteSubscriptionAddonHandler(subject, reply string, request *req
 	}
 
 	// Get the current quota value.
-	quotaValue, quotaFound, err := d.GetCurrentQuota(
+	quotaValue, _, err := d.GetCurrentQuota(
 		ctx,
 		subAddon.Addon.ResourceType.ID,
 		subAddon.Subscription.ID,
@@ -437,7 +436,6 @@ func (a *App) DeleteSubscriptionAddonHandler(subject, reply string, request *req
 	quotaValue = quotaValue - subAddon.Amount
 	if err = d.UpsertQuota(
 		ctx,
-		quotaFound,
 		quotaValue,
 		subAddon.Addon.ResourceType.ID,
 		subAddon.Subscription.ID,
@@ -508,7 +506,7 @@ func (a *App) UpdateSubscriptionAddonHandler(subject, reply string, request *qms
 		}
 
 		// Get the current quota value.
-		quotaValue, quotaFound, err := d.GetCurrentQuota(
+		quotaValue, _, err := d.GetCurrentQuota(
 			ctx,
 			preUpdateSubAddon.Addon.ResourceType.ID,
 			preUpdateSubAddon.Subscription.ID,
@@ -529,7 +527,6 @@ func (a *App) UpdateSubscriptionAddonHandler(subject, reply string, request *qms
 		// Now update the quota value
 		if err = d.UpsertQuota(
 			ctx,
-			quotaFound,
 			quotaValue,
 			preUpdateSubAddon.Addon.ResourceType.ID,
 			preUpdateSubAddon.Subscription.ID,

@@ -225,7 +225,7 @@ func (d *Database) ProcessUpdateForQuota(ctx context.Context, update *Update, op
 			return err
 		}
 
-		quotaValue, quotaFound, err := d.GetCurrentQuota(ctx, update.ResourceType.ID, subscription.ID, WithTX(tx))
+		quotaValue, _, err := d.GetCurrentQuota(ctx, update.ResourceType.ID, subscription.ID, WithTX(tx))
 		if err != nil {
 			return err
 		}
@@ -241,7 +241,6 @@ func (d *Database) ProcessUpdateForQuota(ctx context.Context, update *Update, op
 
 		if err = d.UpsertQuota(
 			ctx,
-			quotaFound,
 			quotaValue,
 			update.ResourceType.ID,
 			subscription.ID,

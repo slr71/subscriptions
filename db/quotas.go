@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/doug-martin/goqu/v9"
-	"github.com/doug-martin/goqu/v9/exec"
 )
 
 // GetCurrentQuota returns the current quota value for a resource type and
@@ -45,7 +44,7 @@ func (d *Database) GetCurrentQuota(ctx context.Context, resourceTypeID, subscrip
 // UpsertQuota inserts or updates a quota into the database for the given
 // resource type and user plan. Accepts a variable number of QueryOptions,
 // though only WithTX is currently supported.
-func (d *Database) UpsertQuota(ctx context.Context, update bool, value float64, resourceTypeID, subscriptionID string, opts ...QueryOption) error {
+func (d *Database) UpsertQuota(ctx context.Context, value float64, resourceTypeID, subscriptionID string, opts ...QueryOption) error {
 	var (
 		err error
 		db  GoquDatabase
@@ -61,17 +60,13 @@ func (d *Database) UpsertQuota(ctx context.Context, update bool, value float64, 
 		"last_modified_by": "de",
 	}
 
-	var upsertE exec.QueryExecutor
-	if !update {
-		upsertE = db.Insert("quotas").Rows(updateRecord).Executor()
-	} else {
-		upsertE = db.Update("quotas").Set(updateRecord).Where(
-			goqu.And(
-				goqu.I("resource_type_id").Eq(resourceTypeID),
-				goqu.I("subscription_id").Eq(subscriptionID),
-			),
+	upsertE := db.Insert("quotas").
+		Rows(updateRecord).
+		OnConflict(
+			goqu.DoUpdate(
+				"resource_type_id, subscription_id",
+				goqu.C("quota").Set(goqu.I("excluded.quota"))),
 		).Executor()
-	}
 
 	log.Info(upsertE.ToSQL())
 
