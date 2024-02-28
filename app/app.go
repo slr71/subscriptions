@@ -50,29 +50,29 @@ func (a *App) validateUpdate(request *qms.AddUpdateRequest) (string, error) {
 	}
 
 	if request.Update.ResourceType.Name == "" || !lo.Contains(
-		db.ResourceTypeNames,
-		request.Update.ResourceType.Name,
+		[]string(db.ResourceTypeNames),
+		string(request.Update.ResourceType.Name),
 	) {
 		return username, errors.ErrInvalidResourceName
 	}
 
 	if request.Update.ResourceType.Unit == "" || !lo.Contains(
-		db.ResourceTypeUnits,
-		request.Update.ResourceType.Unit,
+		[]string(db.ResourceTypeUnits),
+		string(request.Update.ResourceType.Unit),
 	) {
 		return username, errors.ErrInvalidResourceUnit
 	}
 
 	if request.Update.Operation.Name == "" || !lo.Contains(
-		db.UpdateOperationNames,
-		request.Update.Operation.Name,
+		[]string(db.UpdateOperationNames),
+		string(request.Update.Operation.Name),
 	) {
 		return username, errors.ErrInvalidOperationName
 	}
 
 	if request.Update.ValueType == "" || !lo.Contains(
 		[]string{db.UsagesTrackedMetric, db.QuotasTrackedMetric},
-		request.Update.ValueType,
+		string(request.Update.ValueType),
 	) {
 		return username, errors.ErrInvalidValueType
 	}
