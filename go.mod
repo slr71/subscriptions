@@ -30,9 +30,12 @@ require (
 )
 
 require (
-	github.com/cyverse-de/p/go/analysis v0.0.15 // indirect
+	github.com/cyverse-de/p v0.0.0-20240228001927-426a6bd80191 // indirect
+	github.com/cyverse-de/p/go/analysis v0.0.16 // indirect
+	github.com/cyverse-de/p/go/containers v0.0.2 // indirect
 	github.com/cyverse-de/p/go/header v0.0.4 // indirect
 	github.com/cyverse-de/p/go/monitoring v0.0.5 // indirect
+	github.com/cyverse-de/p/go/user v0.0.11 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
@@ -49,7 +52,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.24.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.24.0 // indirect
 	go.opentelemetry.io/otel/trace v1.24.0 // indirect
-	golang.org/x/crypto v0.19.0 // indirect
+	golang.org/x/crypto v0.20.0 // indirect
 	golang.org/x/exp v0.0.0-20240222234643-814bf88cf225 // indirect
 	golang.org/x/sys v0.17.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
