@@ -8,6 +8,22 @@ import (
 	"github.com/doug-martin/goqu/v9"
 )
 
+// SubscriptionOptions contains options for a new subscription.
+type SubscriptionOptions struct {
+	Paid    bool
+	Periods int32
+	EndDate time.Time
+}
+
+// DefaultSubscriptionOptions returns the default subscription options.
+func DefaultSubscriptionOptions() *SubscriptionOptions {
+	return &SubscriptionOptions{
+		Paid:    false,
+		Periods: 1,
+		EndDate: time.Now().AddDate(1, 0, 0),
+	}
+}
+
 // subscriptionDS returns the goqu.SelectDataset for getting user plan info, but with
 // out the goqu.Where() calls.
 func subscriptionDS(db GoquDatabase) *goqu.SelectDataset {
@@ -92,12 +108,12 @@ func (d *Database) GetActiveSubscription(ctx context.Context, username string, o
 }
 
 func (d *Database) SetActiveSubscription(
-	ctx context.Context, userID, planID string, paid bool, opts ...QueryOption,
+	ctx context.Context, userID string, plan *Plan, subscriptionOpts *SubscriptionOptions, opts ...QueryOption,
 ) (string, error) {
 	_, db := d.querySettings(opts...)
 
 	n := time.Now()
-	e := n.AddDate(1, 0, 0)
+	e := subscriptionOpts.EndDate
 
 	query := db.Insert(t.Subscriptions).
 		Rows(
@@ -105,10 +121,10 @@ func (d *Database) SetActiveSubscription(
 				"effective_start_date": n,
 				"effective_end_date":   e,
 				"user_id":              userID,
-				"plan_id":              planID,
+				"plan_id":              plan.ID,
 				"created_by":           "de",
 				"last_modified_by":     "de",
-				"paid":                 paid,
+				"paid":                 subscriptionOpts.Paid,
 			},
 		).
 		Returning(t.Subscriptions.Col("id"))
@@ -120,36 +136,34 @@ func (d *Database) SetActiveSubscription(
 	}
 
 	// Add the quota defaults as the t.Quotas for the user plan.
-	ds := db.Insert(t.Quotas).
-		Cols(
-			"resource_type_id",
-			"subscription_id",
-			"quota",
-			"created_by",
-			"last_modified_by",
-		).
-		FromQuery(
-			goqu.From(t.PQD).
-				Select(
-					t.PQD.Col("resource_type_id"),
-					goqu.V(subscriptionID).As("subscription_id"),
-					t.PQD.Col("quota_value").As("quota"),
-					goqu.V("de").As("created_by"),
-					goqu.V("de").As("last_modified_by"),
-				).
-				Join(t.Plans, goqu.On(t.PQD.Col("plan_id").Eq(t.Plans.Col("id")))).
-				Where(
-					t.Plans.Col("id").Eq(planID),
-				),
+	for _, quotaDefault := range plan.QuotaDefaults {
+		quotaValue := quotaDefault.QuotaValue * float64(subscriptionOpts.Periods)
+		if quotaDefault.ResourceType.Consumable {
+			quotaValue *= float64(subscriptionOpts.Periods)
+		}
+		ds := db.Insert(t.Quotas).
+			Cols(
+				"resource_type_id",
+				"subscription_id",
+				"quota",
+				"created_by",
+				"last_modified_by",
+			).Rows(
+			goqu.Record{
+				"resource_type_id": quotaDefault.ResourceType.ID,
+				"subscription_id":  subscriptionID,
+				"quota":            quotaValue,
+				"created_by":       goqu.V("de"),
+				"last_modified_by": goqu.V("de"),
+			},
 		)
-	d.LogSQL(ds)
-
-	if _, err := ds.Executor().Exec(); err != nil {
-		return subscriptionID, err
+		d.LogSQL(ds)
+		if _, err := ds.Executor().Exec(); err != nil {
+			return subscriptionID, err
+		}
 	}
 
 	return subscriptionID, nil
-
 }
 
 func (d *Database) UserHasActivePlan(ctx context.Context, username string, opts ...QueryOption) (bool, error) {
@@ -235,6 +249,7 @@ func (d *Database) SubscriptionUsages(ctx context.Context, subscriptionID string
 			t.RT.Col("id").As(goqu.C("resource_types.id")),
 			t.RT.Col("name").As(goqu.C("resource_types.name")),
 			t.RT.Col("unit").As(goqu.C("resource_types.unit")),
+			t.RT.Col("consumable").As(goqu.C("resource_types.consumable")),
 		).
 		Join(t.RT, goqu.On(goqu.I("usages.resource_type_id").Eq(goqu.I("resource_types.id")))).
 		Where(t.Usages.Col("subscription_id").Eq(subscriptionID))
@@ -270,6 +285,7 @@ func (d *Database) SubscriptionQuotas(ctx context.Context, subscriptionID string
 			t.RT.Col("id").As(goqu.C("resource_types.id")),
 			t.RT.Col("name").As(goqu.C("resource_types.name")),
 			t.RT.Col("unit").As(goqu.C("resource_types.unit")),
+			t.RT.Col("consumable").As(goqu.C("resource_types.consumable")),
 		).
 		Join(t.RT, goqu.On(goqu.I("quotas.resource_type_id").Eq(goqu.I("resource_types.id")))).
 		Where(t.Quotas.Col("subscription_id").Eq(subscriptionID))
@@ -302,6 +318,7 @@ func (d *Database) SubscriptionQuotaDefaults(ctx context.Context, planID string,
 			t.RT.Col("id").As(goqu.C("resource_types.id")),
 			t.RT.Col("name").As(goqu.C("resource_types.name")),
 			t.RT.Col("unit").As(goqu.C("resource_types.unit")),
+			t.RT.Col("consumable").As(goqu.C("resource_types.consumable")),
 		).
 		Join(t.RT, goqu.On(goqu.I("plan_quota_defaults.resource_type_id").Eq(goqu.I("resource_types.id")))).
 		Where(t.PQD.Col("plan_id").Eq(planID))

@@ -96,9 +96,7 @@ func (a *App) AddAddonHandler(subject, reply string, request *qms.AddAddonReques
 		return
 	}
 	defer func() {
-		if err := tx.Rollback(); err != nil {
-			log.Errorf("unable to roll back the transaction: %s", err)
-		}
+		_ = tx.Rollback()
 	}()
 
 	if reqAddon.ResourceType.Name != "" && reqAddon.ResourceType.Uuid == "" {
@@ -333,9 +331,7 @@ func (a *App) AddSubscriptionAddonHandler(subject, reply string, request *reques
 		return
 	}
 	defer func() {
-		if err := tx.Rollback(); err != nil {
-			log.Errorf("unable to roll back the transaction: %s", err)
-		}
+		_ = tx.Rollback()
 	}()
 
 	subAddon, err := d.AddSubscriptionAddon(ctx, subscriptionID, addonID, db.WithTXRollbackCommit(tx, false, false))
@@ -344,7 +340,7 @@ func (a *App) AddSubscriptionAddonHandler(subject, reply string, request *reques
 		return
 	}
 
-	quotaValue, quotaFound, err := d.GetCurrentQuota(
+	quotaValue, _, err := d.GetCurrentQuota(
 		ctx,
 		subAddon.Addon.ResourceType.ID,
 		subscriptionID,
@@ -358,7 +354,6 @@ func (a *App) AddSubscriptionAddonHandler(subject, reply string, request *reques
 	quotaValue = quotaValue + subAddon.Amount
 	if err = d.UpsertQuota(
 		ctx,
-		quotaFound,
 		quotaValue,
 		subAddon.Addon.ResourceType.ID,
 		subscriptionID,
@@ -405,9 +400,7 @@ func (a *App) DeleteSubscriptionAddonHandler(subject, reply string, request *req
 		return
 	}
 	defer func() {
-		if err := tx.Rollback(); err != nil {
-			log.Errorf("unable to roll back the transaction: %s", err)
-		}
+		_ = tx.Rollback()
 	}()
 
 	// Get the subscription add-on details from the database. Needed to modify
@@ -419,7 +412,7 @@ func (a *App) DeleteSubscriptionAddonHandler(subject, reply string, request *req
 	}
 
 	// Get the current quota value.
-	quotaValue, quotaFound, err := d.GetCurrentQuota(
+	quotaValue, _, err := d.GetCurrentQuota(
 		ctx,
 		subAddon.Addon.ResourceType.ID,
 		subAddon.Subscription.ID,
@@ -437,7 +430,6 @@ func (a *App) DeleteSubscriptionAddonHandler(subject, reply string, request *req
 	quotaValue = quotaValue - subAddon.Amount
 	if err = d.UpsertQuota(
 		ctx,
-		quotaFound,
 		quotaValue,
 		subAddon.Addon.ResourceType.ID,
 		subAddon.Subscription.ID,
@@ -493,9 +485,7 @@ func (a *App) UpdateSubscriptionAddonHandler(subject, reply string, request *qms
 		return
 	}
 	defer func() {
-		if err := tx.Rollback(); err != nil {
-			log.Errorf("unable to roll back the transaction: %s", err)
-		}
+		_ = tx.Rollback()
 	}()
 
 	if updateSubAddon.UpdateAmount {
@@ -508,7 +498,7 @@ func (a *App) UpdateSubscriptionAddonHandler(subject, reply string, request *qms
 		}
 
 		// Get the current quota value.
-		quotaValue, quotaFound, err := d.GetCurrentQuota(
+		quotaValue, _, err := d.GetCurrentQuota(
 			ctx,
 			preUpdateSubAddon.Addon.ResourceType.ID,
 			preUpdateSubAddon.Subscription.ID,
@@ -529,7 +519,6 @@ func (a *App) UpdateSubscriptionAddonHandler(subject, reply string, request *qms
 		// Now update the quota value
 		if err = d.UpsertQuota(
 			ctx,
-			quotaFound,
 			quotaValue,
 			preUpdateSubAddon.Addon.ResourceType.ID,
 			preUpdateSubAddon.Subscription.ID,

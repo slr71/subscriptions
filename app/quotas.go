@@ -31,13 +31,7 @@ func (a *App) AddQuotaHandler(subject, reply string, request *qms.AddQuotaReques
 
 	d := db.New(a.db)
 
-	_, update, err := d.GetCurrentQuota(ctx, request.Quota.ResourceType.Uuid, subscriptionID)
-	if err != nil {
-		sendError(ctx, response, err)
-		return
-	}
-
-	if err = d.UpsertQuota(ctx, update, float64(request.Quota.Quota), request.Quota.ResourceType.Uuid, subscriptionID); err != nil {
+	if err = d.UpsertQuota(ctx, float64(request.Quota.Quota), request.Quota.ResourceType.Uuid, subscriptionID); err != nil {
 		sendError(ctx, response, err)
 		return
 	}

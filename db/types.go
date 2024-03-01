@@ -66,24 +66,27 @@ func (u User) ToQMSUser() *qms.QMSUser {
 }
 
 type ResourceType struct {
-	ID   string `db:"id" goqu:"defaultifempty"`
-	Name string `db:"name"`
-	Unit string `db:"unit"`
+	ID         string `db:"id" goqu:"defaultifempty"`
+	Name       string `db:"name"`
+	Unit       string `db:"unit"`
+	Consumable bool   `db:"consumable"`
 }
 
 func (rt ResourceType) ToQMSResourceType() *qms.ResourceType {
 	return &qms.ResourceType{
-		Uuid: rt.ID,
-		Name: rt.Name,
-		Unit: rt.Unit,
+		Uuid:       rt.ID,
+		Name:       rt.Name,
+		Unit:       rt.Unit,
+		Consumable: rt.Consumable,
 	}
 }
 
 func NewResourceTypeFromQMS(q *qms.ResourceType) *ResourceType {
 	return &ResourceType{
-		ID:   q.Uuid,
-		Name: q.Name,
-		Unit: q.Unit,
+		ID:         q.Uuid,
+		Name:       q.Name,
+		Unit:       q.Unit,
+		Consumable: q.Consumable,
 	}
 }
 

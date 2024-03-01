@@ -7,6 +7,7 @@ import (
 	"github.com/cyverse-de/p/go/qms"
 	"github.com/cyverse-de/subscriptions/db"
 	"github.com/cyverse-de/subscriptions/errors"
+	"github.com/cyverse-de/subscriptions/utils"
 	"github.com/sirupsen/logrus"
 )
 
@@ -38,7 +39,20 @@ func (a *App) AddUserHandler(subject, reply string, request *qms.AddUserRequest)
 
 	d := db.New(a.db)
 
-	log = log.WithFields(logrus.Fields{"user": username})
+	opts, err := utils.OptsForValues(request.Paid, request.Periods, request.EndDate)
+	if err != nil {
+		sendError(ctx, response, err)
+		return
+	}
+	log = log.WithFields(
+		logrus.Fields{
+			"user":     username,
+			"plan":     request.PlanName,
+			"paid":     opts.Paid,
+			"periods":  opts.Periods,
+			"end_date": opts.EndDate,
+		},
+	)
 
 	tx, err := d.Begin()
 	if err != nil {
@@ -51,7 +65,6 @@ func (a *App) AddUserHandler(subject, reply string, request *qms.AddUserRequest)
 
 	// extract information about the subscription from the request
 	planName := request.PlanName
-	paid := request.Paid
 
 	plan, err := d.GetPlanByName(ctx, planName, db.WithTX(tx))
 	if err != nil {
@@ -83,34 +96,34 @@ func (a *App) AddUserHandler(subject, reply string, request *qms.AddUserRequest)
 		}
 	}
 
-	// set the user's plan to the one retrieved earlier.
-	hasPlan, err := d.UserHasActivePlan(ctx, username, db.WithTX(tx))
-	if err != nil {
-		sendError(ctx, response, err)
-		return
-	}
+	// Create a new subscription if the caller requested it.
+	createSubscription := request.Force
 
-	if !hasPlan {
-		// If the user isn't on a plan, put them on one.
-		if _, err = d.SetActiveSubscription(ctx, userID, plan.ID, paid, db.WithTX(tx)); err != nil {
+	// Also create a new subscription if the user doesn't have one yet.
+	if !createSubscription {
+		hasPlan, err := d.UserHasActivePlan(ctx, username, db.WithTX(tx))
+		if err != nil {
 			sendError(ctx, response, err)
 			return
 		}
+		createSubscription = !hasPlan
+	}
 
-	} else {
-		// If user is on a plan, check if it's the one the request contained.
+	// Also create a new subscription if the user's current subscription plan doesn't match the requested one.
+	if !createSubscription {
 		onPlan, err := d.UserOnPlan(ctx, username, plan.Name, db.WithTX(tx))
 		if err != nil {
 			sendError(ctx, response, err)
 			return
 		}
+		createSubscription = !onPlan
+	}
 
-		// If the user isn't on the plan contained in the request, put them on it.
-		if !onPlan {
-			if _, err = d.SetActiveSubscription(ctx, userID, plan.ID, paid, db.WithTX(tx)); err != nil {
-				sendError(ctx, response, err)
-				return
-			}
+	// Create the subscription if we're supposed to.
+	if createSubscription {
+		if _, err = d.SetActiveSubscription(ctx, userID, plan, opts, db.WithTX(tx)); err != nil {
+			sendError(ctx, response, err)
+			return
 		}
 	}
 
