@@ -3,15 +3,18 @@ package app
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/cyverse-de/go-mod/logging"
 	"github.com/cyverse-de/go-mod/pbinit"
 	"github.com/cyverse-de/p/go/qms"
+	"github.com/cyverse-de/subscriptions/common"
 	"github.com/cyverse-de/subscriptions/db"
 	"github.com/cyverse-de/subscriptions/errors"
 	"github.com/cyverse-de/subscriptions/natscl"
 	"github.com/jmoiron/sqlx"
+	"github.com/labstack/echo/v4"
 	"github.com/samber/lo"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -22,17 +25,45 @@ var log = logging.Log.WithFields(logrus.Fields{"package": "apps"})
 type App struct {
 	client         *natscl.Client
 	db             *sqlx.DB
+	Router         *echo.Echo
 	userSuffix     string
 	ReportOverages bool
 }
 
 func New(client *natscl.Client, db *sqlx.DB, userSuffix string) *App {
-	return &App{
+	app := &App{
 		client:         client,
 		db:             db,
 		userSuffix:     userSuffix,
+		Router:         echo.New(),
 		ReportOverages: true,
 	}
+
+	app.Router.HTTPErrorHandler = func(err error, c echo.Context) {
+		code := http.StatusInternalServerError
+		var body interface{}
+
+		switch err := err.(type) {
+		case common.ErrorResponse:
+			code = http.StatusBadRequest
+			body = err
+		case *common.ErrorResponse:
+			code = http.StatusBadRequest
+			body = err
+		case *echo.HTTPError:
+			echoErr := err
+			code = echoErr.Code
+			body = common.NewErrorResponse(err)
+		default:
+			body = common.NewErrorResponse(err)
+		}
+
+		c.JSON(code, body) // nolint:errcheck
+	}
+
+	app.Router.GET("/", app.GreetingHTTPHandler).Name = "greeting"
+
+	return app
 }
 
 func (a *App) FixUsername(username string) (string, error) {
@@ -82,6 +113,10 @@ func (a *App) validateUpdate(request *qms.AddUpdateRequest) (string, error) {
 	}
 
 	return username, nil
+}
+
+func (a *App) GreetingHTTPHandler(ctx echo.Context) error {
+	return ctx.String(http.StatusOK, "Hello from subscriptions.")
 }
 
 func (a *App) GetUserUpdatesHandler(subject, reply string, request *qms.UpdateListRequest) {

@@ -143,7 +143,7 @@ func main() {
 
 	a := app.New(natsClient, dbconn, userSuffix)
 
-	handlers := map[string]nats.Handler{
+	natsHandlers := map[string]nats.Handler{
 		qmssubs.GetUserUpdates: a.GetUserUpdatesHandler,
 		qmssubs.AddUserUpdate:  a.AddUserUpdateHandler,
 
@@ -175,12 +175,12 @@ func main() {
 		qmssubs.GetSubscriptionAddon:    a.GetSubscriptionAddonHandler,
 	}
 
-	for subject, handler := range handlers {
+	for subject, handler := range natsHandlers {
 		if err = natsClient.Subscribe(subject, handler); err != nil {
 			log.Fatal(err)
 		}
 	}
 
 	srv := fmt.Sprintf(":%s", strconv.Itoa(*listenPort))
-	log.Fatal(http.ListenAndServe(srv, nil))
+	log.Fatal(http.ListenAndServe(srv, a.Router))
 }
