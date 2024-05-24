@@ -62,6 +62,7 @@ func New(client *natscl.Client, db *sqlx.DB, userSuffix string) *App {
 	}
 
 	app.Router.GET("/", app.GreetingHTTPHandler).Name = "greeting"
+	app.Router.GET("/summary/:user", app.GetUserSummaryHTTPHandler)
 
 	return app
 }
