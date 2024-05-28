@@ -3,11 +3,13 @@ package app
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/cyverse-de/go-mod/pbinit"
 	"github.com/cyverse-de/p/go/qms"
 	"github.com/cyverse-de/subscriptions/db"
 	"github.com/cyverse-de/subscriptions/errors"
+	"github.com/labstack/echo/v4"
 	"github.com/sirupsen/logrus"
 )
 
@@ -123,4 +125,29 @@ func (a *App) GetUserSummaryHandler(subject, reply string, request *qms.RequestB
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
+}
+
+func (a *App) GetUserSummaryHTTPHandler(c echo.Context) error {
+	var err error
+
+	log := log.WithFields(logrus.Fields{"context": "user summary http"})
+	ctx := c.Request().Context()
+	response := pbinit.NewSubscriptionResponse()
+
+	username := c.Param("user")
+
+	username, err = a.FixUsername(username)
+	if err != nil {
+		return err
+	}
+
+	log = log.WithFields(logrus.Fields{"user": username})
+
+	subscription, err := a.GetUserSummary(ctx, username)
+	if err != nil {
+		return err
+	}
+
+	response.Subscription = subscription
+	return c.JSON(http.StatusOK, response)
 }
