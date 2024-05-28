@@ -55,45 +55,38 @@ func (a *App) sendSubscriptionAddonResponseError(reply string, log *logrus.Entry
 	}
 }
 
-func (a *App) AddAddonHandler(subject, reply string, request *qms.AddAddonRequest) {
-	var err error
-
-	ctx, span := qmsinit.InitAddAddonRequest(request, subject)
-	defer span.End()
-
-	log := log.WithField("context", "adding new available addon")
-	response := qmsinit.NewAddonResponse()
-	sendError := a.sendAddonResponseError(reply, log)
+func (a *App) addAddon(ctx context.Context, request *qms.AddAddonRequest) *qms.AddonResponse {
 	d := db.New(a.db)
 
 	reqAddon := request.Addon
+	response := qmsinit.NewAddonResponse()
 
 	if reqAddon.Name == "" {
-		sendError(ctx, response, errors.New("name must be set"))
-		return
+		response.Error = serrors.NatsError(ctx, errors.New("name must be set"))
+		return response
 	}
 
 	if reqAddon.Description == "" {
-		sendError(ctx, response, errors.New("descriptions must be set"))
-		return
+		response.Error = serrors.NatsError(ctx, errors.New("descriptions must be set"))
+		return response
 	}
 
 	if reqAddon.DefaultAmount <= 0.0 {
-		sendError(ctx, response, errors.New("default_amount must be greater than 0.0"))
-		return
+		response.Error = serrors.NatsError(ctx, errors.New("default_amount must be greater than 0.0"))
+		return response
 	}
 
 	if reqAddon.ResourceType.Name == "" && reqAddon.ResourceType.Uuid == "" {
-		sendError(ctx, response, errors.New("resource_type.name or resource_type.uuid must be set"))
-		return
+		response.Error = serrors.NatsError(ctx, errors.New("resource_type.name or resource_type.uuid must be set"))
+		return response
 	}
 
 	var lookupRT *db.ResourceType
 
 	tx, err := d.Begin()
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = serrors.NatsError(ctx, err)
+		return response
 	}
 	defer func() {
 		_ = tx.Rollback()
@@ -102,14 +95,14 @@ func (a *App) AddAddonHandler(subject, reply string, request *qms.AddAddonReques
 	if reqAddon.ResourceType.Name != "" && reqAddon.ResourceType.Uuid == "" {
 		lookupRT, err = d.GetResourceTypeByName(ctx, reqAddon.ResourceType.Name, db.WithTX(tx))
 		if err != nil {
-			sendError(ctx, response, err)
-			return
+			response.Error = serrors.NatsError(ctx, err)
+			return response
 		}
 	} else {
 		lookupRT, err = d.GetResourceType(ctx, reqAddon.ResourceType.Uuid, db.WithTX(tx))
 		if err != nil {
-			sendError(ctx, response, err)
-			return
+			response.Error = serrors.NatsError(ctx, err)
+			return response
 		}
 	}
 
@@ -118,21 +111,53 @@ func (a *App) AddAddonHandler(subject, reply string, request *qms.AddAddonReques
 
 	newID, err := d.AddAddon(ctx, newAddon, db.WithTX(tx))
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = serrors.NatsError(ctx, err)
+		return response
 	}
 
 	if err = tx.Commit(); err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = serrors.NatsError(ctx, err)
+		return response
 	}
 
 	response.Addon = newAddon.ToQMSType()
 	response.Addon.Uuid = newID
+	return response
+}
+
+func (a *App) AddAddonHandler(subject, reply string, request *qms.AddAddonRequest) {
+	var err error
+
+	ctx, span := qmsinit.InitAddAddonRequest(request, subject)
+	defer span.End()
+
+	log := log.WithField("context", "adding new available addon")
+
+	response := a.addAddon(ctx, request)
+
+	if response.Error != nil {
+		log.Error(response.Error.Message)
+	}
 
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
+}
+
+func (a *App) listAddons(ctx context.Context, request *qms.NoParamsRequest) *qms.AddonListResponse {
+	response := qmsinit.NewAddonListResponse()
+	d := db.New(a.db)
+
+	results, err := d.ListAddons(ctx)
+	if err != nil {
+		response.Error = serrors.NatsError(ctx, err)
+		return response
+	}
+
+	for _, addon := range results {
+		response.Addons = append(response.Addons, addon.ToQMSType())
+	}
+	return response
 }
 
 // ListAddonsHandler lists all of the available add-ons in the system. These are
@@ -145,23 +170,38 @@ func (a *App) ListAddonsHandler(subject, reply string, request *qms.NoParamsRequ
 	defer span.End()
 
 	log := log.WithField("context", "list addons")
-	sendError := a.sendAddonListResponseError(reply, log)
-	response := qmsinit.NewAddonListResponse()
-	d := db.New(a.db)
 
-	results, err := d.ListAddons(ctx)
-	if err != nil {
-		sendError(ctx, response, err)
-		return
-	}
+	response := a.listAddons(ctx, request)
 
-	for _, addon := range results {
-		response.Addons = append(response.Addons, addon.ToQMSType())
+	if response.Error != nil {
+		log.Error(response.Error.Message)
 	}
 
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
+}
+
+func (a *App) updateAddon(ctx context.Context, request *qms.UpdateAddonRequest) *qms.AddonResponse {
+	response := qmsinit.NewAddonResponse()
+	d := db.New(a.db)
+
+	if request.Addon.Uuid == "" {
+		response.Error = serrors.NatsError(ctx, errors.New("uuid must be set in the request"))
+		return response
+	}
+
+	updateAddon := db.NewUpdateAddonFromQMS(request)
+
+	result, err := d.UpdateAddon(ctx, updateAddon)
+	if err != nil {
+		response.Error = serrors.NatsError(ctx, err)
+		return response
+	}
+
+	response.Addon = result.ToQMSType()
+
+	return response
 }
 
 func (a *App) UpdateAddonHandler(subject, reply string, request *qms.UpdateAddonRequest) {
@@ -169,39 +209,46 @@ func (a *App) UpdateAddonHandler(subject, reply string, request *qms.UpdateAddon
 
 	log := log.WithField("context", "update addon")
 
-	response := qmsinit.NewAddonResponse()
-
-	sendError := func(ctx context.Context, response *qms.AddonResponse, err error) {
-		log.Error(err)
-		response.Error = serrors.NatsError(ctx, err)
-		if err = a.client.Respond(ctx, reply, response); err != nil {
-			log.Error(err)
-		}
-	}
-
 	ctx, span := qmsinit.InitUpdateAddonRequest(request, subject)
 	defer span.End()
 
-	d := db.New(a.db)
+	response := a.updateAddon(ctx, request)
 
-	if request.Addon.Uuid == "" {
-		sendError(ctx, response, errors.New("uuid must be set in the request"))
-		return
+	if response.Error != nil {
+		log.Error(response.Error.Message)
 	}
-
-	updateAddon := db.NewUpdateAddonFromQMS(request)
-
-	result, err := d.UpdateAddon(ctx, updateAddon)
-	if err != nil {
-		sendError(ctx, response, err)
-		return
-	}
-
-	response.Addon = result.ToQMSType()
 
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
+}
+
+func (a *App) deleteAddon(ctx context.Context, request *requests.ByUUID) *qms.AddonResponse {
+	response := qmsinit.NewAddonResponse()
+
+	d := db.New(a.db)
+
+	subAddons, err := d.ListSubscriptionAddonsByAddonID(ctx, request.Uuid)
+	if err != nil {
+		response.Error = serrors.NatsError(ctx, err)
+		return response
+	}
+
+	if len(subAddons) > 0 {
+		response.Error = serrors.NatsError(ctx, serrors.ErrSubscriptionAddonsExist)
+		return response
+	}
+
+	if err = d.DeleteAddon(ctx, request.Uuid); err != nil {
+		response.Error = serrors.NatsError(ctx, err)
+		return response
+	}
+
+	response.Addon = &qms.Addon{
+		Uuid: request.Uuid,
+	}
+
+	return response
 }
 
 func (a *App) DeleteAddonHandler(subject, reply string, request *requests.ByUUID) {
@@ -209,44 +256,36 @@ func (a *App) DeleteAddonHandler(subject, reply string, request *requests.ByUUID
 
 	log := log.WithField("context", "delete addon")
 
-	response := qmsinit.NewAddonResponse()
-
-	sendError := func(ctx context.Context, response *qms.AddonResponse, err error) {
-		log.Error(err)
-		response.Error = serrors.NatsError(ctx, err)
-		if err = a.client.Respond(ctx, reply, response); err != nil {
-			log.Error(err)
-		}
-	}
-
 	ctx, span := reqinit.InitByUUID(request, subject)
 	defer span.End()
 
-	d := db.New(a.db)
+	response := a.deleteAddon(ctx, request)
 
-	subAddons, err := d.ListSubscriptionAddonsByAddonID(ctx, request.Uuid)
-	if err != nil {
-		sendError(ctx, response, err)
-		return
-	}
-
-	if len(subAddons) > 0 {
-		sendError(ctx, response, serrors.ErrSubscriptionAddonsExist)
-		return
-	}
-
-	if err = d.DeleteAddon(ctx, request.Uuid); err != nil {
-		sendError(ctx, response, err)
-		return
-	}
-
-	response.Addon = &qms.Addon{
-		Uuid: request.Uuid,
+	if response.Error != nil {
+		log.Error(response.Error.Message)
 	}
 
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
+}
+
+func (a *App) listSubscriptionAddons(ctx context.Context, request *requests.ByUUID) *qms.SubscriptionAddonListResponse {
+	response := qmsinit.NewSubscriptionAddonListResponse()
+
+	d := db.New(a.db)
+
+	results, err := d.ListSubscriptionAddons(ctx, request.Uuid)
+	if err != nil {
+		response.Error = serrors.NatsError(ctx, err)
+		return response
+	}
+
+	for _, addon := range results {
+		response.SubscriptionAddons = append(response.SubscriptionAddons, addon.ToQMSType())
+	}
+
+	return response
 }
 
 // ListSubscriptionAddonsHandler lists the add-ons that have been applied to the
@@ -258,23 +297,31 @@ func (a *App) ListSubscriptionAddonsHandler(subject, reply string, request *requ
 	defer span.End()
 
 	log := log.WithField("context", "listing subscription add-ons")
-	response := qmsinit.NewSubscriptionAddonListResponse()
-	sendError := a.sendSubscriptionAddonListResponseError(reply, log)
-	d := db.New(a.db)
 
-	results, err := d.ListSubscriptionAddons(ctx, request.Uuid)
-	if err != nil {
-		sendError(ctx, response, err)
-		return
-	}
-
-	for _, addon := range results {
-		response.SubscriptionAddons = append(response.SubscriptionAddons, addon.ToQMSType())
+	response := a.listSubscriptionAddons(ctx, request)
+	if response.Error != nil {
+		log.Error(response.Error.Message)
 	}
 
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
+}
+
+func (a *App) getSubscription(ctx context.Context, request *requests.ByUUID) *qms.SubscriptionAddonResponse {
+	response := qmsinit.NewSubscriptionAddonResponse()
+
+	d := db.New(a.db)
+
+	subAddon, err := d.GetSubscriptionAddonByID(ctx, request.Uuid)
+	if err != nil {
+		response.Error = serrors.NatsError(ctx, err)
+		return response
+	}
+
+	response.SubscriptionAddon = subAddon.ToQMSType()
+
+	return response
 }
 
 // GetSubscriptionAddonHandler gets a single addon based on it's UUID.
@@ -285,50 +332,38 @@ func (a *App) GetSubscriptionAddonHandler(subject, reply string, request *reques
 	defer span.End()
 
 	log := log.WithField("context", "getting subscription add-on")
-	response := qmsinit.NewSubscriptionAddonResponse()
-	sendError := a.sendSubscriptionAddonResponseError(reply, log)
-	d := db.New(a.db)
 
-	subAddon, err := d.GetSubscriptionAddonByID(ctx, request.Uuid)
-	if err != nil {
-		sendError(ctx, response, err)
-		return
+	response := a.getSubscription(ctx, request)
+
+	if response.Error != nil {
+		log.Error(response.Error.Message)
 	}
-
-	response.SubscriptionAddon = subAddon.ToQMSType()
 
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
 }
 
-func (a *App) AddSubscriptionAddonHandler(subject, reply string, request *requests.AssociateByUUIDs) {
-	var err error
-
-	ctx, span := reqinit.InitAssociateByUUIDs(request, subject)
-	defer span.End()
-
-	log := log.WithField("context", "adding subscription add-on")
+func (a *App) addSubscription(ctx context.Context, request *requests.AssociateByUUIDs) *qms.SubscriptionAddonResponse {
 	response := qmsinit.NewSubscriptionAddonResponse()
-	sendError := a.sendSubscriptionAddonResponseError(reply, log)
 	d := db.New(a.db)
 
 	subscriptionID := request.ParentUuid
 	if subscriptionID == "" {
-		sendError(ctx, response, errors.New("parent_uuid must be set to the subscription UUID"))
-		return
+		response.Error = serrors.NatsError(ctx, errors.New("parent_uuid must be set to the subscription UUID"))
+		return response
 	}
 
 	addonID := request.ChildUuid
 	if addonID == "" {
-		sendError(ctx, response, errors.New("child_id must be set to the add-on UUID"))
-		return
+		response.Error = serrors.NatsError(ctx, errors.New("child_id must be set to the add-on UUID"))
+		return response
 	}
 
 	tx, err := d.Begin()
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = serrors.NatsError(ctx, err)
+		return response
 	}
 	defer func() {
 		_ = tx.Rollback()
@@ -336,8 +371,8 @@ func (a *App) AddSubscriptionAddonHandler(subject, reply string, request *reques
 
 	subAddon, err := d.AddSubscriptionAddon(ctx, subscriptionID, addonID, db.WithTXRollbackCommit(tx, false, false))
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = serrors.NatsError(ctx, err)
+		return response
 	}
 
 	quotaValue, _, err := d.GetCurrentQuota(
@@ -347,8 +382,8 @@ func (a *App) AddSubscriptionAddonHandler(subject, reply string, request *reques
 		db.WithTXRollbackCommit(tx, false, false),
 	)
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = serrors.NatsError(ctx, err)
+		return response
 	}
 
 	quotaValue = quotaValue + subAddon.Amount
@@ -359,45 +394,54 @@ func (a *App) AddSubscriptionAddonHandler(subject, reply string, request *reques
 		subscriptionID,
 		db.WithTXRollbackCommit(tx, false, false),
 	); err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = serrors.NatsError(ctx, err)
+		return response
 	}
 
 	if err = tx.Commit(); err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = serrors.NatsError(ctx, err)
+		return response
 	}
 
 	response.SubscriptionAddon = subAddon.ToQMSType()
+	return response
+}
+
+func (a *App) AddSubscriptionAddonHandler(subject, reply string, request *requests.AssociateByUUIDs) {
+	var err error
+
+	ctx, span := reqinit.InitAssociateByUUIDs(request, subject)
+	defer span.End()
+
+	log := log.WithField("context", "adding subscription add-on")
+
+	response := a.addSubscription(ctx, request)
+
+	if response.Error != nil {
+		log.Error(response.Error.Message)
+	}
 
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
 }
 
-func (a *App) DeleteSubscriptionAddonHandler(subject, reply string, request *requests.ByUUID) {
-	var err error
-
-	ctx, span := reqinit.InitByUUID(request, subject)
-	defer span.End()
-
-	log := log.WithField("context", "deleting subscription add-ons")
+func (a *App) deleteSubscriptionAddon(ctx context.Context, request *requests.ByUUID) *qms.SubscriptionAddonResponse {
 	response := qmsinit.NewSubscriptionAddonResponse()
-	sendError := a.sendSubscriptionAddonResponseError(reply, log)
 	d := db.New(a.db)
 
 	// Get the subscription add-on ID out of the request.
 	subAddonID := request.Uuid
 	if subAddonID == "" {
-		sendError(ctx, response, errors.New("subscription add-on UUID must be set"))
-		return
+		response.Error = serrors.NatsError(ctx, errors.New("subscription addon-on UUID must be set"))
+		return response
 	}
 
 	/// Start the database transaction.
 	tx, err := d.Begin()
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = serrors.NatsError(ctx, err)
+		return response
 	}
 	defer func() {
 		_ = tx.Rollback()
@@ -407,8 +451,8 @@ func (a *App) DeleteSubscriptionAddonHandler(subject, reply string, request *req
 	// the quota value.
 	subAddon, err := d.GetSubscriptionAddonByID(ctx, subAddonID, db.WithTX(tx))
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = serrors.NatsError(ctx, err)
+		return response
 	}
 
 	// Get the current quota value.
@@ -419,8 +463,8 @@ func (a *App) DeleteSubscriptionAddonHandler(subject, reply string, request *req
 		db.WithTXRollbackCommit(tx, false, false),
 	)
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = serrors.NatsError(ctx, err)
+		return response
 	}
 
 	// Update the quota value by subtracting the amount configured in the
@@ -435,44 +479,55 @@ func (a *App) DeleteSubscriptionAddonHandler(subject, reply string, request *req
 		subAddon.Subscription.ID,
 		db.WithTXRollbackCommit(tx, false, false),
 	); err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = serrors.NatsError(ctx, err)
+		return response
 	}
 
 	// Delete the subscription add-on.
 	if err = d.DeleteSubscriptionAddon(ctx, subAddonID, db.WithTX(tx)); err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = serrors.NatsError(ctx, err)
+		return response
 	}
 
 	// Commit all of the changes.
 	if err = tx.Commit(); err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = serrors.NatsError(ctx, err)
+		return response
 	}
 
 	// Return the response.
 	response.SubscriptionAddon = subAddon.ToQMSType()
+
+	return response
+}
+
+func (a *App) DeleteSubscriptionAddonHandler(subject, reply string, request *requests.ByUUID) {
+	var err error
+
+	ctx, span := reqinit.InitByUUID(request, subject)
+	defer span.End()
+
+	log := log.WithField("context", "deleting subscription add-ons")
+
+	response := a.deleteSubscriptionAddon(ctx, request)
+
+	if response.Error != nil {
+		log.Error(response.Error.Message)
+	}
 
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
 }
 
-func (a *App) UpdateSubscriptionAddonHandler(subject, reply string, request *qms.UpdateSubscriptionAddonRequest) {
-	var err error
-
-	ctx, span := qmsinit.InitUpdateSubscriptionAddonRequest(request, subject)
-	defer span.End()
-
-	log := log.WithField("context", "update subscription addon")
+func (a *App) updateSubscriptionAddon(ctx context.Context, request *qms.UpdateSubscriptionAddonRequest) *qms.SubscriptionAddonResponse {
 	response := qmsinit.NewSubscriptionAddonResponse()
-	sendError := a.sendSubscriptionAddonResponseError(reply, log)
+
 	d := db.New(a.db)
 
 	if request.SubscriptionAddon.Uuid == "" {
-		sendError(ctx, response, errors.New("uuid must be set in the request"))
-		return
+		response.Error = serrors.NatsError(ctx, errors.New("uuid must be set in the request"))
+		return response
 	}
 
 	subAddonID := request.SubscriptionAddon.Uuid
@@ -481,8 +536,8 @@ func (a *App) UpdateSubscriptionAddonHandler(subject, reply string, request *qms
 	/// Start the database transaction.
 	tx, err := d.Begin()
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = serrors.NatsError(ctx, err)
+		return response
 	}
 	defer func() {
 		_ = tx.Rollback()
@@ -493,8 +548,8 @@ func (a *App) UpdateSubscriptionAddonHandler(subject, reply string, request *qms
 		// to modify the quota value.
 		preUpdateSubAddon, err := d.GetSubscriptionAddonByID(ctx, subAddonID, db.WithTX(tx))
 		if err != nil {
-			sendError(ctx, response, err)
-			return
+			response.Error = serrors.NatsError(ctx, err)
+			return response
 		}
 
 		// Get the current quota value.
@@ -505,8 +560,8 @@ func (a *App) UpdateSubscriptionAddonHandler(subject, reply string, request *qms
 			db.WithTXRollbackCommit(tx, false, false),
 		)
 		if err != nil {
-			sendError(ctx, response, err)
-			return
+			response.Error = serrors.NatsError(ctx, err)
+			return response
 		}
 
 		// First, remove the pre-update subscription add-on value from the quota
@@ -524,23 +579,40 @@ func (a *App) UpdateSubscriptionAddonHandler(subject, reply string, request *qms
 			preUpdateSubAddon.Subscription.ID,
 			db.WithTXRollbackCommit(tx, false, false),
 		); err != nil {
-			sendError(ctx, response, err)
-			return
+			response.Error = serrors.NatsError(ctx, err)
+			return response
 		}
 	}
 
 	result, err := d.UpdateSubscriptionAddon(ctx, updateSubAddon, db.WithTXRollbackCommit(tx, false, false))
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = serrors.NatsError(ctx, err)
+		return response
 	}
 
 	if err = tx.Commit(); err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = serrors.NatsError(ctx, err)
+		return response
 	}
 
 	response.SubscriptionAddon = result.ToQMSType()
+
+	return response
+}
+
+func (a *App) UpdateSubscriptionAddonHandler(subject, reply string, request *qms.UpdateSubscriptionAddonRequest) {
+	var err error
+
+	ctx, span := qmsinit.InitUpdateSubscriptionAddonRequest(request, subject)
+	defer span.End()
+
+	log := log.WithField("context", "update subscription addon")
+
+	response := a.updateSubscriptionAddon(ctx, request)
+
+	if response.Error != nil {
+		log.Debug(response.Error.Message)
+	}
 
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
