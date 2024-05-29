@@ -21,7 +21,7 @@ func (a *App) sendPlanResponseError(reply string, log *logrus.Entry) func(contex
 	}
 }
 
-func (a *App) listPlans(ctx context.Context, request *qms.NoParamsRequest) *qms.PlanList {
+func (a *App) listPlans(ctx context.Context) *qms.PlanList {
 	response := pbinit.NewPlanList()
 
 	d := db.New(a.db)
@@ -64,7 +64,7 @@ func (a *App) ListPlansHandler(subject, reply string, request *qms.NoParamsReque
 	ctx, span := pbinit.InitQMSNoParamsRequest(request, subject)
 	defer span.End()
 
-	response := a.listPlans(ctx, request)
+	response := a.listPlans(ctx)
 
 	if response.Error != nil {
 		log.Error(response.Error.Message)

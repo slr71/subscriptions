@@ -144,7 +144,7 @@ func (a *App) AddAddonHandler(subject, reply string, request *qms.AddAddonReques
 	}
 }
 
-func (a *App) listAddons(ctx context.Context, request *qms.NoParamsRequest) *qms.AddonListResponse {
+func (a *App) listAddons(ctx context.Context) *qms.AddonListResponse {
 	response := qmsinit.NewAddonListResponse()
 	d := db.New(a.db)
 
@@ -171,7 +171,7 @@ func (a *App) ListAddonsHandler(subject, reply string, request *qms.NoParamsRequ
 
 	log := log.WithField("context", "list addons")
 
-	response := a.listAddons(ctx, request)
+	response := a.listAddons(ctx)
 
 	if response.Error != nil {
 		log.Error(response.Error.Message)
