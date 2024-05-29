@@ -284,7 +284,7 @@ func (a *App) addUserUpdate(ctx context.Context, request *qms.AddUpdateRequest) 
 		switch update.ValueType {
 		case db.UsagesTrackedMetric:
 			log.Info("processing update for usage")
-			if err != nil {
+			if err = d.ProcessUpdateForUsage(ctx, update); err != nil {
 				response.Error = errors.NatsError(ctx, err)
 				return response
 			}
@@ -292,7 +292,7 @@ func (a *App) addUserUpdate(ctx context.Context, request *qms.AddUpdateRequest) 
 
 		case db.QuotasTrackedMetric:
 			log.Info("processing update for quota")
-			if err != nil {
+			if err = d.ProcessUpdateForQuota(ctx, update); err != nil {
 				response.Error = errors.NatsError(ctx, err)
 				return response
 			}
