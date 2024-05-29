@@ -87,67 +87,53 @@ func (a *App) GetUserSummary(ctx context.Context, username string) (*qms.Subscri
 	return subscription.ToQMSSubscription(), nil
 }
 
+func (a *App) getUserSummary(ctx context.Context, request *qms.RequestByUsername) *qms.SubscriptionResponse {
+	response := pbinit.NewSubscriptionResponse()
+
+	username, err := a.FixUsername(request.Username)
+	if err != nil {
+		response.Error = errors.NatsError(ctx, err)
+		return response
+	}
+
+	subscription, err := a.GetUserSummary(ctx, username)
+	if err != nil {
+		response.Error = errors.NatsError(ctx, err)
+		return response
+	}
+
+	response.Subscription = subscription
+
+	return response
+}
+
 func (a *App) GetUserSummaryHandler(subject, reply string, request *qms.RequestByUsername) {
 	var err error
 
 	log := log.WithFields(logrus.Fields{"context": "user summary"})
 
-	response := pbinit.NewSubscriptionResponse()
-
 	ctx, span := pbinit.InitQMSRequestByUsername(request, subject)
 	defer span.End()
 
-	sendError := func(ctx context.Context, response *qms.SubscriptionResponse, err error) {
-		log.Error(err)
-		response.Error = errors.NatsError(ctx, err)
-		if err = a.client.Respond(ctx, reply, response); err != nil {
-			log.Error(err)
-		}
-	}
+	response := a.getUserSummary(ctx, request)
 
-	username, err := a.FixUsername(request.Username)
-	if err != nil {
-		sendError(ctx, response, err)
-		return
-	}
-
-	log = log.WithFields(logrus.Fields{"user": username})
-
-	subscription, err := a.GetUserSummary(ctx, username)
-	if err != nil {
-		sendError(ctx, response, err)
-		return
-	}
-
-	log.Warnf("Reply: %s", reply)
-
-	response.Subscription = subscription
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
 }
 
 func (a *App) GetUserSummaryHTTPHandler(c echo.Context) error {
-	var err error
-
-	log := log.WithFields(logrus.Fields{"context": "user summary http"})
 	ctx := c.Request().Context()
-	response := pbinit.NewSubscriptionResponse()
 
-	username := c.Param("user")
-
-	username, err = a.FixUsername(username)
-	if err != nil {
-		return err
+	request := &qms.RequestByUsername{
+		Username: c.Param("user"),
 	}
 
-	log = log.WithFields(logrus.Fields{"user": username})
+	response := a.getUserSummary(ctx, request)
 
-	subscription, err := a.GetUserSummary(ctx, username)
-	if err != nil {
-		return err
+	if response.Error != nil {
+		return c.JSON(int(response.Error.StatusCode), response)
 	}
 
-	response.Subscription = subscription
 	return c.JSON(http.StatusOK, response)
 }

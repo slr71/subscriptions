@@ -11,42 +11,27 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func (a *App) GetUsagesHandler(subject, reply string, request *qms.GetUsages) {
-	var err error
-
-	log := log.WithFields(logrus.Fields{"context": "getting usages"})
+func (a *App) getUsages(ctx context.Context, request *qms.GetUsages) *qms.UsageList {
 	response := pbinit.NewUsageList()
-	ctx, span := pbinit.InitGetUsages(request, subject)
-	defer span.End()
-
-	sendError := func(ctx context.Context, response *qms.UsageList, err error) {
-		log.Error(err)
-		response.Error = errors.NatsError(ctx, err)
-		if err = a.client.Respond(ctx, reply, response); err != nil {
-			log.Error(err)
-		}
-	}
 
 	username, err := a.FixUsername(request.Username)
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = errors.NatsError(ctx, err)
+		return response
 	}
-
-	log = log.WithFields(logrus.Fields{"user": username})
 
 	d := db.New(a.db)
 
 	subscription, err := d.GetActiveSubscription(ctx, username)
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = errors.NatsError(ctx, err)
+		return response
 	}
 
 	usages, err := d.SubscriptionUsages(ctx, subscription.ID)
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = errors.NatsError(ctx, err)
+		return response
 	}
 
 	for _, usage := range usages {
@@ -66,59 +51,59 @@ func (a *App) GetUsagesHandler(subject, reply string, request *qms.GetUsages) {
 		})
 	}
 
-	log.Info("successfully found usages")
+	return response
+}
+
+func (a *App) GetUsagesHandler(subject, reply string, request *qms.GetUsages) {
+	var err error
+
+	log := log.WithFields(logrus.Fields{"context": "getting usages"})
+
+	ctx, span := pbinit.InitGetUsages(request, subject)
+	defer span.End()
+
+	response := a.getUsages(ctx, request)
+
+	if response.Error != nil {
+		log.Error(response.Error.Message)
+	}
 
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
 }
 
-func (a *App) AddUsageHandler(subject, reply string, request *qms.AddUsage) {
+func (a *App) addUsage(ctx context.Context, request *qms.AddUsage) *qms.UsageResponse {
 	var (
 		err   error
 		usage db.Usage
 	)
 
-	log := log.WithFields(logrus.Fields{"context": "adding usage information"})
-
-	log.Debugf("subject: %s; reply: %s", subject, reply)
-
 	response := pbinit.NewUsageResponse()
-	ctx, span := pbinit.InitAddUsage(request, subject)
-	defer span.End()
-
-	sendError := func(ctx context.Context, response *qms.UsageResponse, err error) {
-		log.Error(err)
-		response.Error = errors.NatsError(ctx, err)
-		if err = a.client.Respond(ctx, reply, response); err != nil {
-			log.Error(err)
-		}
-	}
-
 	username, err := a.FixUsername(request.Username)
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = errors.NatsError(ctx, err)
+		return response
 	}
 
 	d := db.New(a.db)
 
 	subscription, err := d.GetActiveSubscription(ctx, username)
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = errors.NatsError(ctx, err)
+		return response
 	}
 
 	// Validate update type.
 	if _, err = d.GetOperationID(ctx, request.UpdateType); err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = errors.NatsError(ctx, err)
+		return response
 	}
 
 	resourceID, err := d.GetResourceTypeID(ctx, request.ResourceName, request.ResourceUnit)
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = errors.NatsError(ctx, err)
+		return response
 	}
 
 	usage = db.Usage{
@@ -132,7 +117,42 @@ func (a *App) AddUsageHandler(subject, reply string, request *qms.AddUsage) {
 	}
 
 	if err = d.CalculateUsage(ctx, request.UpdateType, &usage); err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = errors.NatsError(ctx, err)
+		return response
+	}
+
+	u, _, err := d.GetCurrentUsage(ctx, resourceID, subscription.ID)
+	if err != nil {
+		response.Error = errors.NatsError(ctx, err)
+		return response
+	}
+
+	response.Usage = &qms.Usage{
+		Usage:          u,
+		SubscriptionId: subscription.ID,
+		ResourceType: &qms.ResourceType{
+			Uuid: resourceID,
+			Name: request.ResourceName,
+			Unit: request.ResourceUnit,
+		},
+	}
+
+	return response
+}
+
+func (a *App) AddUsageHandler(subject, reply string, request *qms.AddUsage) {
+	var err error
+
+	ctx, span := pbinit.InitAddUsage(request, subject)
+	defer span.End()
+
+	response := a.addUsage(ctx, request)
+
+	if response.Error != nil {
+		log.Error(response.Error.Message)
+	}
+
+	if err = a.client.Respond(ctx, reply, response); err != nil {
+		log.Error(err)
 	}
 }
