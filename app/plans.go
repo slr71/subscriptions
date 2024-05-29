@@ -21,26 +21,14 @@ func (a *App) sendPlanResponseError(reply string, log *logrus.Entry) func(contex
 	}
 }
 
-func (a *App) ListPlansHandler(subject, reply string, request *qms.NoParamsRequest) {
-	log := log.WithField("context", "list plans")
-
-	sendError := func(ctx context.Context, response *qms.PlanList, err error) {
-		log.Error(err)
-		response.Error = errors.NatsError(ctx, err)
-		if err = a.client.Respond(ctx, reply, response); err != nil {
-			log.Error(err)
-		}
-	}
-
+func (a *App) listPlans(ctx context.Context, request *qms.NoParamsRequest) *qms.PlanList {
 	response := pbinit.NewPlanList()
-	ctx, span := pbinit.InitQMSNoParamsRequest(request, subject)
-	defer span.End()
 
 	d := db.New(a.db)
 	plans, err := d.ListPlans(ctx)
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = errors.NatsError(ctx, err)
+		return response
 	}
 
 	for _, p := range plans {
@@ -66,19 +54,29 @@ func (a *App) ListPlansHandler(subject, reply string, request *qms.NoParamsReque
 		response.Plans = append(response.Plans, newP)
 	}
 
+	return response
+}
+
+func (a *App) ListPlansHandler(subject, reply string, request *qms.NoParamsRequest) {
+	var err error
+	log := log.WithField("context", "list plans")
+
+	ctx, span := pbinit.InitQMSNoParamsRequest(request, subject)
+	defer span.End()
+
+	response := a.listPlans(ctx, request)
+
+	if response.Error != nil {
+		log.Error(response.Error.Message)
+	}
+
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
 }
 
-func (a *App) AddPlanHandler(subject, reply string, request *qms.AddPlanRequest) {
-	log := log.WithField("context", "list plans")
-
-	sendError := a.sendPlanResponseError(reply, log)
-
+func (a *App) addPlan(ctx context.Context, request *qms.AddPlanRequest) *qms.PlanResponse {
 	response := pbinit.NewPlanResponse()
-	ctx, span := pbinit.InitQMSAddPlanRequest(request, subject)
-	defer span.End()
 
 	d := db.New(a.db)
 
@@ -86,8 +84,8 @@ func (a *App) AddPlanHandler(subject, reply string, request *qms.AddPlanRequest)
 	var newPlanID string
 	tx, err := d.Begin()
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = errors.NatsError(ctx, err)
+		return response
 	}
 	err = tx.Wrap(func() error {
 		var err error
@@ -111,34 +109,45 @@ func (a *App) AddPlanHandler(subject, reply string, request *qms.AddPlanRequest)
 
 		return err
 	})
+
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = errors.NatsError(ctx, err)
+		return response
 	}
 
 	response.Plan = request.Plan
 	response.Plan.Uuid = newPlanID
+
+	return response
+}
+
+func (a *App) AddPlanHandler(subject, reply string, request *qms.AddPlanRequest) {
+	var err error
+	log := log.WithField("context", "list plans")
+
+	ctx, span := pbinit.InitQMSAddPlanRequest(request, subject)
+	defer span.End()
+
+	response := a.addPlan(ctx, request)
+
+	if response.Error != nil {
+		log.Error(response.Error.Message)
+	}
 
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
 }
 
-func (a *App) GetPlanHandler(subject, reply string, request *qms.PlanRequest) {
-	log := log.WithField("context", "get plan")
-
-	sendError := a.sendPlanResponseError(reply, log)
-
+func (a *App) getPlan(ctx context.Context, request *qms.PlanRequest) *qms.PlanResponse {
 	response := pbinit.NewPlanResponse()
-	ctx, span := pbinit.InitQMSPlanRequest(request, subject)
-	defer span.End()
 
 	d := db.New(a.db)
 
 	plan, err := d.GetPlanByID(ctx, request.PlanId)
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = errors.NatsError(ctx, err)
+		return response
 	}
 
 	response.Plan = &qms.Plan{
@@ -162,21 +171,45 @@ func (a *App) GetPlanHandler(subject, reply string, request *qms.PlanRequest) {
 			})
 	}
 
+	return response
+}
+
+func (a *App) GetPlanHandler(subject, reply string, request *qms.PlanRequest) {
+	var err error
+	log := log.WithField("context", "get plan")
+
+	ctx, span := pbinit.InitQMSPlanRequest(request, subject)
+	defer span.End()
+
+	response := a.getPlan(ctx, request)
+
+	if response.Error != nil {
+		log.Error(response.Error.Message)
+	}
+
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
 }
 
-func (a *App) UpsertQuotaDefaultsHandler(subject, reply string, request *qms.AddPlanQuotaDefaultRequest) {
-	sendError := func(ctx context.Context, response *qms.QuotaDefaultResponse, err error) {
-		log.Error(err)
-		response.Error = errors.NatsError(ctx, err)
-		if err = a.client.Respond(ctx, reply, response); err != nil {
-			log.Error(err)
-		}
-	}
+func (a *App) upsertQuotaDefault(ctx context.Context, _ *qms.AddPlanQuotaDefaultRequest) *qms.QuotaDefaultResponse {
 	response := pbinit.NewQuotaDefaultResponse()
+	response.Error = errors.NatsError(ctx, fmt.Errorf("not implemented"))
+	return response
+}
+
+func (a *App) UpsertQuotaDefaultsHandler(subject, reply string, request *qms.AddPlanQuotaDefaultRequest) {
+	var err error
+
 	ctx, span := pbinit.InitQMSAddPlanQuotaDefaultRequest(request, subject)
 	defer span.End()
-	sendError(ctx, response, fmt.Errorf("not implemented"))
+
+	response := a.upsertQuotaDefault(ctx, request)
+	if response.Error != nil {
+		log.Error(response.Error.Message)
+	}
+
+	if err = a.client.Respond(ctx, reply, response); err != nil {
+		log.Error(err)
+	}
 }

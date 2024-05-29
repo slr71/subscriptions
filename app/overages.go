@@ -6,51 +6,31 @@ import (
 	"github.com/cyverse-de/go-mod/pbinit"
 	"github.com/cyverse-de/p/go/qms"
 	"github.com/cyverse-de/subscriptions/db"
-	"github.com/cyverse-de/subscriptions/errors"
+	serrors "github.com/cyverse-de/subscriptions/errors"
 	"github.com/sirupsen/logrus"
 )
 
-func (a *App) GetUserOverages(subject, reply string, request *qms.AllUserOveragesRequest) {
-	var err error
-
-	log := log.WithFields(logrus.Fields{"context": "list overages"})
-
+func (a *App) getUserOverages(ctx context.Context, request *qms.AllUserOveragesRequest) *qms.OverageList {
 	response := pbinit.NewOverageList()
-	ctx, span := pbinit.InitAllUserOveragesRequest(request, subject)
-	defer span.End()
-
-	sendError := func(ctx context.Context, response *qms.OverageList, err error) {
-		log.Error(err)
-		response.Error = errors.NatsError(ctx, err)
-		if err = a.client.Respond(ctx, reply, response); err != nil {
-			log.Error(err)
-		}
-	}
 
 	username, err := a.FixUsername(request.Username)
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = serrors.NatsError(ctx, err)
+		return response
 	}
-
-	log = log.WithFields(logrus.Fields{"user": username})
 
 	// If s.ReportOverages is false, then return the empty list of overages that was just created.
 	if !a.ReportOverages {
-		if err = a.client.Respond(ctx, reply, response); err != nil {
-			log.Error(err)
-		}
-		return
+		return response
 	}
 
 	d := db.New(a.db)
 
 	results, err := d.GetUserOverages(ctx, username)
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = serrors.NatsError(ctx, err)
+		return response
 	}
-	log.Debug("after calling db.GetUserOverages()")
 
 	for _, r := range results {
 		quota := r.QuotaValue
@@ -65,42 +45,40 @@ func (a *App) GetUserOverages(subject, reply string, request *qms.AllUserOverage
 		}
 	}
 
+	return response
+}
+
+func (a *App) GetUserOverages(subject, reply string, request *qms.AllUserOveragesRequest) {
+	var err error
+
+	log := log.WithFields(logrus.Fields{"context": "list overages"})
+
+	ctx, span := pbinit.InitAllUserOveragesRequest(request, subject)
+	defer span.End()
+
+	response := a.getUserOverages(ctx, request)
+
+	if response.Error != nil {
+		log.Error(response.Error.Message)
+	}
+
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
 }
 
-func (a *App) CheckUserOverages(subject, reply string, request *qms.IsOverageRequest) {
-	var err error
-
-	log := log.WithFields(logrus.Fields{"context": "check if in overage"})
-
-	sendError := func(ctx context.Context, response *qms.IsOverage, err error) {
-		log.Error(err)
-		response.Error = errors.NatsError(ctx, err)
-		if err = a.client.Respond(ctx, reply, response); err != nil {
-			log.Error(err)
-		}
-	}
-
+func (a *App) checkUserOverages(ctx context.Context, request *qms.IsOverageRequest) *qms.IsOverage {
 	response := pbinit.NewIsOverage()
-	ctx, span := pbinit.InitIsOverageRequest(request, subject)
-	defer span.End()
 
 	if !a.ReportOverages {
 		response.IsOverage = false
-
-		if err = a.client.Respond(ctx, reply, response); err != nil {
-			log.Error(err)
-		}
-
-		return
+		return response
 	}
 
 	username, err := a.FixUsername(request.Username)
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = serrors.NatsError(ctx, err)
+		return response
 	}
 
 	log = log.WithFields(logrus.Fields{"user": username})
@@ -109,10 +87,9 @@ func (a *App) CheckUserOverages(subject, reply string, request *qms.IsOverageReq
 
 	overages, err := d.GetUserOverages(ctx, username)
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = serrors.NatsError(ctx, err)
+		return response
 	}
-
 	if len(overages) > 0 {
 		for _, overage := range overages {
 			if overage.ResourceType.Name == request.GetResourceName() {
@@ -121,6 +98,23 @@ func (a *App) CheckUserOverages(subject, reply string, request *qms.IsOverageReq
 		}
 	} else {
 		response.IsOverage = false
+	}
+
+	return response
+}
+
+func (a *App) CheckUserOverages(subject, reply string, request *qms.IsOverageRequest) {
+	var err error
+
+	log := log.WithFields(logrus.Fields{"context": "check if in overage"})
+
+	ctx, span := pbinit.InitIsOverageRequest(request, subject)
+	defer span.End()
+
+	response := a.checkUserOverages(ctx, request)
+
+	if response.Error != nil {
+		log.Error(response.Error.Message)
 	}
 
 	if err = a.client.Respond(ctx, reply, response); err != nil {
