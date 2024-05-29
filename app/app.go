@@ -63,6 +63,15 @@ func New(client *natscl.Client, db *sqlx.DB, userSuffix string) *App {
 
 	app.Router.GET("/", app.GreetingHTTPHandler).Name = "greeting"
 	app.Router.GET("/summary/:user", app.GetUserSummaryHTTPHandler)
+	app.Router.PUT("/addons", app.AddAddonHTTPHandler)
+	app.Router.GET("/addons", app.ListAddonsHTTPHandler)
+	app.Router.POST("/addons/:uuid", app.UpdateAddonHTTPHandler)
+	app.Router.DELETE("/addons/:uuid", app.DeleteAddonHTTPHandler)
+	app.Router.GET("/subscriptions/:uuid/addons", app.ListSubscriptionAddonsHTTPHandler)
+	app.Router.GET("/subscriptions/:sub_uuid/addons/:addon_uuid", app.GetSubscriptionAddonHTTPHandler)
+	app.Router.PUT("/subscriptions/:sub_uuid/addons/:addon_uuid", app.AddSubscriptionAddonHTTPHandler)
+	app.Router.DELETE("/subscriptions/:sub_uuid/addons/:addon_uuid", app.DeleteSubscriptionAddonHTTPHandler)
+	app.Router.POST("/subscriptions/:sub_uuid/addons/:addon_uuid", app.UpdateSubscriptionAddonHTTPHandler)
 
 	return app
 }

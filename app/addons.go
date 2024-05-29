@@ -2,11 +2,12 @@ package app
 
 import (
 	"context"
+	"net/http"
 
 	"errors"
 
 	serrors "github.com/cyverse-de/subscriptions/errors"
-	"github.com/sirupsen/logrus"
+	"github.com/labstack/echo/v4"
 
 	qmsinit "github.com/cyverse-de/go-mod/pbinit/qms"
 	reqinit "github.com/cyverse-de/go-mod/pbinit/requests"
@@ -14,46 +15,6 @@ import (
 	"github.com/cyverse-de/p/go/requests"
 	"github.com/cyverse-de/subscriptions/db"
 )
-
-func (a *App) sendAddonResponseError(reply string, log *logrus.Entry) func(context.Context, *qms.AddonResponse, error) {
-	return func(ctx context.Context, response *qms.AddonResponse, err error) {
-		log.Error(err)
-		response.Error = serrors.NatsError(ctx, err)
-		if err = a.client.Respond(ctx, reply, response); err != nil {
-			log.Error(err)
-		}
-	}
-}
-
-func (a *App) sendAddonListResponseError(reply string, log *logrus.Entry) func(context.Context, *qms.AddonListResponse, error) {
-	return func(ctx context.Context, response *qms.AddonListResponse, err error) {
-		log.Error(err)
-		response.Error = serrors.NatsError(ctx, err)
-		if err = a.client.Respond(ctx, reply, response); err != nil {
-			log.Error(err)
-		}
-	}
-}
-
-func (a *App) sendSubscriptionAddonListResponseError(reply string, log *logrus.Entry) func(context.Context, *qms.SubscriptionAddonListResponse, error) {
-	return func(ctx context.Context, response *qms.SubscriptionAddonListResponse, err error) {
-		log.Error(err)
-		response.Error = serrors.NatsError(ctx, err)
-		if err = a.client.Respond(ctx, reply, response); err != nil {
-			log.Error(err)
-		}
-	}
-}
-
-func (a *App) sendSubscriptionAddonResponseError(reply string, log *logrus.Entry) func(context.Context, *qms.SubscriptionAddonResponse, error) {
-	return func(ctx context.Context, response *qms.SubscriptionAddonResponse, err error) {
-		log.Error(err)
-		response.Error = serrors.NatsError(ctx, err)
-		if err = a.client.Respond(ctx, reply, response); err != nil {
-			log.Error(err)
-		}
-	}
-}
 
 func (a *App) addAddon(ctx context.Context, request *qms.AddAddonRequest) *qms.AddonResponse {
 	d := db.New(a.db)
@@ -144,6 +105,30 @@ func (a *App) AddAddonHandler(subject, reply string, request *qms.AddAddonReques
 	}
 }
 
+func (a *App) AddAddonHTTPHandler(c echo.Context) error {
+	var (
+		err     error
+		request qms.AddAddonRequest
+	)
+
+	ctx := c.Request().Context()
+
+	if err = c.Bind(&request); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"message": "invalid body format",
+		})
+	}
+
+	response := a.addAddon(ctx, &request)
+
+	if response.Error != nil {
+		return c.JSON(int(response.Error.StatusCode), response)
+	}
+
+	return c.JSON(http.StatusOK, response)
+
+}
+
 func (a *App) listAddons(ctx context.Context) *qms.AddonListResponse {
 	response := qmsinit.NewAddonListResponse()
 	d := db.New(a.db)
@@ -180,6 +165,19 @@ func (a *App) ListAddonsHandler(subject, reply string, request *qms.NoParamsRequ
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
+}
+
+func (a *App) ListAddonsHTTPHandler(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	response := a.listAddons(ctx)
+
+	if response.Error != nil {
+		return c.JSON(int(response.Error.StatusCode), response)
+	}
+
+	return c.JSON(http.StatusOK, response)
+
 }
 
 func (a *App) updateAddon(ctx context.Context, request *qms.UpdateAddonRequest) *qms.AddonResponse {
@@ -221,6 +219,32 @@ func (a *App) UpdateAddonHandler(subject, reply string, request *qms.UpdateAddon
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
+}
+
+func (a *App) UpdateAddonHTTPHandler(c echo.Context) error {
+	var (
+		err     error
+		request qms.UpdateAddonRequest
+	)
+
+	ctx := c.Request().Context()
+
+	if err = c.Bind(&request); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"message": "bad request",
+		})
+	}
+
+	request.Addon.Uuid = c.Param("uuid")
+
+	response := a.updateAddon(ctx, &request)
+
+	if response.Error != nil {
+		return c.JSON(int(response.Error.StatusCode), response)
+	}
+
+	return c.JSON(http.StatusOK, response)
+
 }
 
 func (a *App) deleteAddon(ctx context.Context, request *requests.ByUUID) *qms.AddonResponse {
@@ -270,6 +294,22 @@ func (a *App) DeleteAddonHandler(subject, reply string, request *requests.ByUUID
 	}
 }
 
+func (a *App) DeleteAddonHTTPHandler(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	request := requests.ByUUID{
+		Uuid: c.Param("uuid"),
+	}
+
+	response := a.deleteAddon(ctx, &request)
+
+	if response.Error != nil {
+		return c.JSON(int(response.Error.StatusCode), response)
+	}
+
+	return c.JSON(http.StatusOK, response)
+}
+
 func (a *App) listSubscriptionAddons(ctx context.Context, request *requests.ByUUID) *qms.SubscriptionAddonListResponse {
 	response := qmsinit.NewSubscriptionAddonListResponse()
 
@@ -308,7 +348,23 @@ func (a *App) ListSubscriptionAddonsHandler(subject, reply string, request *requ
 	}
 }
 
-func (a *App) getSubscription(ctx context.Context, request *requests.ByUUID) *qms.SubscriptionAddonResponse {
+func (a *App) ListSubscriptionAddonsHTTPHandler(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	request := &requests.ByUUID{
+		Uuid: c.Param("uuid"),
+	}
+
+	response := a.listSubscriptionAddons(ctx, request)
+
+	if response.Error != nil {
+		return c.JSON(int(response.Error.StatusCode), response)
+	}
+
+	return c.JSON(http.StatusOK, response)
+}
+
+func (a *App) getSubscriptionAddon(ctx context.Context, request *requests.ByUUID) *qms.SubscriptionAddonResponse {
 	response := qmsinit.NewSubscriptionAddonResponse()
 
 	d := db.New(a.db)
@@ -333,7 +389,7 @@ func (a *App) GetSubscriptionAddonHandler(subject, reply string, request *reques
 
 	log := log.WithField("context", "getting subscription add-on")
 
-	response := a.getSubscription(ctx, request)
+	response := a.getSubscriptionAddon(ctx, request)
 
 	if response.Error != nil {
 		log.Error(response.Error.Message)
@@ -344,7 +400,23 @@ func (a *App) GetSubscriptionAddonHandler(subject, reply string, request *reques
 	}
 }
 
-func (a *App) addSubscription(ctx context.Context, request *requests.AssociateByUUIDs) *qms.SubscriptionAddonResponse {
+func (a *App) GetSubscriptionAddonHTTPHandler(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	request := &requests.ByUUID{
+		Uuid: c.Param("addon_uuid"),
+	}
+
+	response := a.getSubscriptionAddon(ctx, request)
+
+	if response.Error != nil {
+		return c.JSON(int(response.Error.StatusCode), response)
+	}
+
+	return c.JSON(http.StatusOK, response)
+}
+
+func (a *App) addSubscriptionAddon(ctx context.Context, request *requests.AssociateByUUIDs) *qms.SubscriptionAddonResponse {
 	response := qmsinit.NewSubscriptionAddonResponse()
 	d := db.New(a.db)
 
@@ -415,7 +487,7 @@ func (a *App) AddSubscriptionAddonHandler(subject, reply string, request *reques
 
 	log := log.WithField("context", "adding subscription add-on")
 
-	response := a.addSubscription(ctx, request)
+	response := a.addSubscriptionAddon(ctx, request)
 
 	if response.Error != nil {
 		log.Error(response.Error.Message)
@@ -424,6 +496,23 @@ func (a *App) AddSubscriptionAddonHandler(subject, reply string, request *reques
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
+}
+
+func (a *App) AddSubscriptionAddonHTTPHandler(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	request := &requests.AssociateByUUIDs{
+		ParentUuid: c.Param("sub_uuid"),
+		ChildUuid:  c.Param("addon_uuid"),
+	}
+
+	response := a.addSubscriptionAddon(ctx, request)
+
+	if response.Error != nil {
+		return c.JSON(int(response.Error.StatusCode), response)
+	}
+
+	return c.JSON(http.StatusOK, response)
 }
 
 func (a *App) deleteSubscriptionAddon(ctx context.Context, request *requests.ByUUID) *qms.SubscriptionAddonResponse {
@@ -518,6 +607,22 @@ func (a *App) DeleteSubscriptionAddonHandler(subject, reply string, request *req
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
+}
+
+func (a *App) DeleteSubscriptionAddonHTTPHandler(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	request := &requests.ByUUID{
+		Uuid: c.Param("addon_uuid"),
+	}
+
+	response := a.deleteSubscriptionAddon(ctx, request)
+
+	if response.Error != nil {
+		return c.JSON(int(response.Error.StatusCode), response)
+	}
+
+	return c.JSON(http.StatusOK, response)
 }
 
 func (a *App) updateSubscriptionAddon(ctx context.Context, request *qms.UpdateSubscriptionAddonRequest) *qms.SubscriptionAddonResponse {
@@ -617,4 +722,27 @@ func (a *App) UpdateSubscriptionAddonHandler(subject, reply string, request *qms
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
+}
+
+func (a *App) UpdateSubscriptionAddonHTTPHandler(c echo.Context) error {
+	var (
+		err     error
+		request qms.UpdateSubscriptionAddonRequest
+	)
+
+	ctx := c.Request().Context()
+
+	if err = c.Bind(&request); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"message": "bad request",
+		})
+	}
+
+	response := a.updateSubscriptionAddon(ctx, &request)
+
+	if response.Error != nil {
+		return c.JSON(int(response.Error.StatusCode), response)
+	}
+
+	return c.JSON(http.StatusOK, response)
 }
