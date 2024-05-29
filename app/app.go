@@ -120,28 +120,13 @@ func (a *App) GreetingHTTPHandler(ctx echo.Context) error {
 	return ctx.String(http.StatusOK, "Hello from subscriptions.")
 }
 
-func (a *App) GetUserUpdatesHandler(subject, reply string, request *qms.UpdateListRequest) {
-	var err error
-
-	log := log.WithFields(logrus.Fields{"context": "get all user updates over nats"})
+func (a *App) getUserUpdates(ctx context.Context, request *qms.UpdateListRequest) *qms.UpdateListResponse {
 	response := pbinit.NewQMSUpdateListResponse()
-	ctx, span := pbinit.InitQMSUpdateListRequest(request, subject)
-	defer span.End()
-
-	// Avoid duplicating a lot of error reporting code.
-	sendError := func(ctx context.Context, response *qms.UpdateListResponse, err error) {
-		log.Error(err)
-		response.Error = errors.NatsError(ctx, err)
-		if err = a.client.Respond(ctx, reply, response); err != nil {
-			log.Error(err)
-		}
-	}
 
 	username, err := a.FixUsername(request.User.Username)
 	if err != nil {
-		sendError(ctx, response, err)
-		return
-
+		response.Error = errors.NatsError(ctx, err)
+		return response
 	}
 
 	log = log.WithFields(logrus.Fields{"user": username})
@@ -150,8 +135,8 @@ func (a *App) GetUserUpdatesHandler(subject, reply string, request *qms.UpdateLi
 
 	mUpdates, err := d.UserUpdates(ctx, username)
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = errors.NatsError(ctx, err)
+		return response
 	}
 
 	for _, mu := range mUpdates {
@@ -176,39 +161,43 @@ func (a *App) GetUserUpdatesHandler(subject, reply string, request *qms.UpdateLi
 		})
 	}
 
+	return response
+}
+
+func (a *App) GetUserUpdatesHandler(subject, reply string, request *qms.UpdateListRequest) {
+	var err error
+
+	log := log.WithFields(logrus.Fields{"context": "get all user updates over nats"})
+
+	ctx, span := pbinit.InitQMSUpdateListRequest(request, subject)
+	defer span.End()
+
+	response := a.getUserUpdates(ctx, request)
+
+	if response.Error != nil {
+		log.Error(response.Error.Message)
+	}
+
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
 }
 
-func (a *App) AddUserUpdateHandler(subject, reply string, request *qms.AddUpdateRequest) {
+func (a *App) addUserUpdate(ctx context.Context, request *qms.AddUpdateRequest) *qms.AddUpdateResponse {
 	var (
 		err                                 error
 		userID, resourceTypeID, operationID string
 		update                              *db.Update
 	)
 
-	// Initialize the response.
-	log := log.WithFields(logrus.Fields{"context": "add a user update over nats"})
 	response := pbinit.NewQMSAddUpdateResponse()
-	ctx, span := pbinit.InitQMSAddUpdateRequest(request, subject)
-	defer span.End()
-
-	// Avoid duplicating a lot of error reporting code.
-	sendError := func(ctx context.Context, response *qms.AddUpdateResponse, err error) {
-		log.Error(err)
-		response.Error = errors.NatsError(ctx, err)
-		if err = a.client.Respond(ctx, reply, response); err != nil {
-			log.Error(err)
-		}
-	}
 
 	d := db.New(a.db)
 
 	username, err := a.validateUpdate(request)
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = errors.NatsError(ctx, err)
+		return response
 	}
 
 	log = log.WithFields(logrus.Fields{"user": username})
@@ -218,8 +207,8 @@ func (a *App) AddUserUpdateHandler(subject, reply string, request *qms.AddUpdate
 		log.Infof("getting user ID for %s", username)
 		user, err := d.EnsureUser(ctx, username)
 		if err != nil {
-			sendError(ctx, response, err)
-			return
+			response.Error = errors.NatsError(ctx, err)
+			return response
 		}
 		userID = user.ID
 		log.Infof("user ID for %s is %s", username, userID)
@@ -237,8 +226,8 @@ func (a *App) AddUserUpdateHandler(subject, reply string, request *qms.AddUpdate
 			request.Update.ResourceType.Unit,
 		)
 		if err != nil {
-			sendError(ctx, response, err)
-			return
+			response.Error = errors.NatsError(ctx, err)
+			return response
 		}
 		log.Infof("resource type id for resource %s is '%s'", request.Update.ResourceType.Name, resourceTypeID)
 	} else {
@@ -254,8 +243,8 @@ func (a *App) AddUserUpdateHandler(subject, reply string, request *qms.AddUpdate
 			request.Update.Operation.Name,
 		)
 		if err != nil {
-			sendError(ctx, response, err)
-			return
+			response.Error = errors.NatsError(ctx, err)
+			return response
 		}
 		log.Infof("operation ID for %s is %s", request.Update.Operation.Name, operationID)
 	} else {
@@ -287,32 +276,32 @@ func (a *App) AddUserUpdateHandler(subject, reply string, request *qms.AddUpdate
 		log.Info("adding update to the database")
 		_, err = d.AddUserUpdate(ctx, update)
 		if err != nil {
-			sendError(ctx, response, err)
-			return
+			response.Error = errors.NatsError(ctx, err)
+			return response
 		}
 		log.Info("done adding update to the database")
 
 		switch update.ValueType {
 		case db.UsagesTrackedMetric:
 			log.Info("processing update for usage")
-			if err = d.ProcessUpdateForUsage(ctx, update); err != nil {
-				sendError(ctx, response, err)
-				return
+			if err != nil {
+				response.Error = errors.NatsError(ctx, err)
+				return response
 			}
 			log.Info("after processing update for usage")
 
 		case db.QuotasTrackedMetric:
 			log.Info("processing update for quota")
-			if err = d.ProcessUpdateForQuota(ctx, update); err != nil {
-				sendError(ctx, response, err)
-				return
+			if err != nil {
+				response.Error = errors.NatsError(ctx, err)
+				return response
 			}
 			log.Info("after processing update for quota")
 
 		default:
 			err = fmt.Errorf("unknown value type in update: %s", update.ValueType)
-			sendError(ctx, response, err)
-			return
+			response.Error = errors.NatsError(ctx, err)
+			return response
 		}
 
 		// Set up the object for the response.
@@ -335,6 +324,24 @@ func (a *App) AddUserUpdateHandler(subject, reply string, request *qms.AddUpdate
 				Username: update.User.Username,
 			},
 		}
+	}
+
+	return response
+}
+
+func (a *App) AddUserUpdateHandler(subject, reply string, request *qms.AddUpdateRequest) {
+	var err error
+
+	// Initialize the response.
+	log := log.WithFields(logrus.Fields{"context": "add a user update over nats"})
+
+	ctx, span := pbinit.InitQMSAddUpdateRequest(request, subject)
+	defer span.End()
+
+	response := a.addUserUpdate(ctx, request)
+
+	if response.Error != nil {
+		log.Error(response.Error.Message)
 	}
 
 	// Send the response to the caller
