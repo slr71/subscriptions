@@ -2,12 +2,14 @@ package app
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/cyverse-de/go-mod/pbinit"
 	"github.com/cyverse-de/p/go/qms"
 	"github.com/cyverse-de/subscriptions/db"
 	"github.com/cyverse-de/subscriptions/errors"
 	"github.com/cyverse-de/subscriptions/utils"
+	"github.com/labstack/echo/v4"
 	"github.com/sirupsen/logrus"
 )
 
@@ -140,4 +142,29 @@ func (a *App) AddUserHandler(subject, reply string, request *qms.AddUserRequest)
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
+}
+
+func (a *App) AddUserHTTPHandler(c echo.Context) error {
+	var (
+		err     error
+		request qms.AddUserRequest
+	)
+
+	ctx := c.Request().Context()
+
+	if err = c.Bind(&request); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"message": "bad request",
+		})
+	}
+
+	request.Username = c.Param("username")
+
+	response := a.addUser(ctx, &request)
+
+	if response.Error != nil {
+		return c.JSON(int(response.Error.StatusCode), response)
+	}
+
+	return c.JSON(http.StatusOK, response)
 }

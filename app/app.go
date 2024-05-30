@@ -72,10 +72,18 @@ func New(client *natscl.Client, db *sqlx.DB, userSuffix string) *App {
 	app.Router.PUT("/subscriptions/:sub_uuid/addons/:addon_uuid", app.AddSubscriptionAddonHTTPHandler)
 	app.Router.DELETE("/subscriptions/:sub_uuid/addons/:addon_uuid", app.DeleteSubscriptionAddonHTTPHandler)
 	app.Router.POST("/subscriptions/:sub_uuid/addons/:addon_uuid", app.UpdateSubscriptionAddonHTTPHandler)
+	app.Router.PUT("/users", app.AddUserHTTPHandler)
 	app.Router.GET("/users/:username/updates", app.GetUserUpdatesHTTPHandler)
 	app.Router.PUT("/user/:username/updates", app.AddUserUpdateHTTPHandler)
 	app.Router.GET("/users/:username/overages", app.GetUserOveragesHTTPHandler)
 	app.Router.GET("/users/:username/overages/:resource_name", app.CheckUserOveragesHTTPHandler)
+	app.Router.GET("/users/:username/usages", app.GetUsagesHTTPHandler)
+	app.Router.PUT("/users/:username/usages", app.AddUsageHTTPHandler)
+	app.Router.GET("/plans", app.ListPlansHTTPHandler)
+	app.Router.PUT("/plans", app.AddPlanHTTPHandler)
+	app.Router.GET("/plans/:plan_id", app.GetPlanHTTPHandler)
+	app.Router.POST("/quotas/defaults", app.UpsertQuotaDefaultsHTTPHandler)
+	app.Router.PUT("/quotas", app.AddQuotaHTTPHandler)
 
 	return app
 }

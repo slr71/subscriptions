@@ -2,11 +2,13 @@ package app
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/cyverse-de/go-mod/pbinit"
 	"github.com/cyverse-de/p/go/qms"
 	"github.com/cyverse-de/subscriptions/db"
 	"github.com/cyverse-de/subscriptions/errors"
+	"github.com/labstack/echo/v4"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -71,6 +73,22 @@ func (a *App) GetUsagesHandler(subject, reply string, request *qms.GetUsages) {
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
+}
+
+func (a *App) GetUsagesHTTPHandler(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	request := &qms.GetUsages{
+		Username: c.Param("username"),
+	}
+
+	response := a.getUsages(ctx, request)
+
+	if response.Error != nil {
+		return c.JSON(int(response.Error.StatusCode), response)
+	}
+
+	return c.JSON(http.StatusOK, response)
 }
 
 func (a *App) addUsage(ctx context.Context, request *qms.AddUsage) *qms.UsageResponse {
@@ -155,4 +173,29 @@ func (a *App) AddUsageHandler(subject, reply string, request *qms.AddUsage) {
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
+}
+
+func (a *App) AddUsageHTTPHandler(c echo.Context) error {
+	var (
+		err     error
+		request qms.AddUsage
+	)
+
+	ctx := c.Request().Context()
+
+	if err = c.Bind(&request); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"message": "bad request",
+		})
+	}
+
+	request.Username = c.Param("username")
+
+	response := a.addUsage(ctx, &request)
+
+	if response.Error != nil {
+		return c.JSON(int(response.Error.StatusCode), response)
+	}
+
+	return c.JSON(http.StatusOK, response)
 }

@@ -2,11 +2,13 @@ package app
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/cyverse-de/go-mod/pbinit"
 	"github.com/cyverse-de/p/go/qms"
 	"github.com/cyverse-de/subscriptions/db"
 	"github.com/cyverse-de/subscriptions/errors"
+	"github.com/labstack/echo/v4"
 )
 
 func (a *App) addQuota(ctx context.Context, request *qms.AddQuotaRequest) *qms.QuotaResponse {
@@ -54,4 +56,27 @@ func (a *App) AddQuotaHandler(subject, reply string, request *qms.AddQuotaReques
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
+}
+
+func (a *App) AddQuotaHTTPHandler(c echo.Context) error {
+	var (
+		err     error
+		request qms.AddQuotaRequest
+	)
+
+	ctx := c.Request().Context()
+
+	if err = c.Bind(&request); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"message": "bad request",
+		})
+	}
+
+	response := a.addQuota(ctx, &request)
+
+	if response.Error != nil {
+		return c.JSON(int(response.Error.StatusCode), response)
+	}
+
+	return c.JSON(http.StatusOK, response)
 }
