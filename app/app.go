@@ -72,6 +72,10 @@ func New(client *natscl.Client, db *sqlx.DB, userSuffix string) *App {
 	app.Router.PUT("/subscriptions/:sub_uuid/addons/:addon_uuid", app.AddSubscriptionAddonHTTPHandler)
 	app.Router.DELETE("/subscriptions/:sub_uuid/addons/:addon_uuid", app.DeleteSubscriptionAddonHTTPHandler)
 	app.Router.POST("/subscriptions/:sub_uuid/addons/:addon_uuid", app.UpdateSubscriptionAddonHTTPHandler)
+	app.Router.GET("/users/:username/updates", app.GetUserUpdatesHTTPHandler)
+	app.Router.PUT("/user/:username/updates", app.AddUserUpdateHTTPHandler)
+	app.Router.GET("/users/:username/overages", app.GetUserOveragesHTTPHandler)
+	app.Router.GET("/users/:username/overages/:resource_name", app.CheckUserOveragesHTTPHandler)
 
 	return app
 }
@@ -190,6 +194,24 @@ func (a *App) GetUserUpdatesHandler(subject, reply string, request *qms.UpdateLi
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
+}
+
+func (a *App) GetUserUpdatesHTTPHandler(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	request := &qms.UpdateListRequest{
+		User: &qms.QMSUser{
+			Username: c.Param("username"),
+		},
+	}
+
+	response := a.getUserUpdates(ctx, request)
+
+	if response.Error != nil {
+		return c.JSON(int(response.Error.StatusCode), response)
+	}
+
+	return c.JSON(http.StatusOK, response)
 }
 
 func (a *App) addUserUpdate(ctx context.Context, request *qms.AddUpdateRequest) *qms.AddUpdateResponse {
@@ -357,4 +379,29 @@ func (a *App) AddUserUpdateHandler(subject, reply string, request *qms.AddUpdate
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
+}
+
+func (a *App) AddUserUpdateHTTPHandler(c echo.Context) error {
+	var (
+		err     error
+		request qms.AddUpdateRequest
+	)
+
+	ctx := c.Request().Context()
+
+	if err = c.Bind(&request); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"message": "bad request",
+		})
+	}
+
+	request.Update.User.Username = c.Param("username")
+
+	response := a.addUserUpdate(ctx, &request)
+
+	if response.Error != nil {
+		return c.JSON(int(response.Error.StatusCode), response)
+	}
+
+	return c.JSON(http.StatusOK, response)
 }

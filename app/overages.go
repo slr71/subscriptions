@@ -2,11 +2,13 @@ package app
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/cyverse-de/go-mod/pbinit"
 	"github.com/cyverse-de/p/go/qms"
 	"github.com/cyverse-de/subscriptions/db"
 	serrors "github.com/cyverse-de/subscriptions/errors"
+	"github.com/labstack/echo/v4"
 	"github.com/sirupsen/logrus"
 )
 
@@ -67,6 +69,22 @@ func (a *App) GetUserOverages(subject, reply string, request *qms.AllUserOverage
 	}
 }
 
+func (a *App) GetUserOveragesHTTPHandler(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	request := &qms.AllUserOveragesRequest{
+		Username: c.Param("username"),
+	}
+
+	response := a.getUserOverages(ctx, request)
+
+	if response.Error != nil {
+		return c.JSON(int(response.Error.StatusCode), response)
+	}
+
+	return c.JSON(http.StatusOK, response)
+}
+
 func (a *App) checkUserOverages(ctx context.Context, request *qms.IsOverageRequest) *qms.IsOverage {
 	response := pbinit.NewIsOverage()
 
@@ -120,4 +138,23 @@ func (a *App) CheckUserOverages(subject, reply string, request *qms.IsOverageReq
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
+}
+
+func (a *App) CheckUserOveragesHTTPHandler(c echo.Context) error {
+	var request qms.IsOverageRequest
+
+	ctx := c.Request().Context()
+
+	request = qms.IsOverageRequest{
+		Username:     c.Param("username"),
+		ResourceName: c.Param("resource_name"),
+	}
+
+	response := a.checkUserOverages(ctx, &request)
+
+	if response.Error != nil {
+		return c.JSON(int(response.Error.StatusCode), response)
+	}
+
+	return c.JSON(http.StatusOK, response)
 }
