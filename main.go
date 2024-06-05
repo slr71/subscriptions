@@ -95,7 +95,7 @@ func main() {
 		log.Fatal(errors.Wrap(err, "Can't parse database.uri in the config file"))
 	}
 
-	userSuffix := config.String("username.suffix")
+	userSuffix := config.String("users.domain")
 	if userSuffix == "" {
 		log.Fatal("users.domain must be set in the configuration file")
 	}
