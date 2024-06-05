@@ -3,7 +3,7 @@ module github.com/cyverse-de/subscriptions
 go 1.22
 
 require (
-	github.com/cyverse-de/go-mod/cfg v0.0.1
+	github.com/cyverse-de/go-mod/cfg v0.0.2
 	github.com/cyverse-de/go-mod/gotelnats v0.0.11
 	github.com/cyverse-de/go-mod/logging v0.0.2
 	github.com/cyverse-de/go-mod/otelutils v0.0.3
@@ -16,6 +16,7 @@ require (
 	github.com/doug-martin/goqu/v9 v9.19.0
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/knadh/koanf v1.5.0
+	github.com/labstack/echo/v4 v4.12.0
 	github.com/lib/pq v1.10.9
 	github.com/nats-io/nats.go v1.34.1
 	github.com/pkg/errors v0.9.1
@@ -40,7 +41,6 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/klauspost/compress v1.17.8 // indirect
-	github.com/labstack/echo/v4 v4.12.0 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
