@@ -3,11 +3,13 @@ package app
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/cyverse-de/go-mod/pbinit"
 	"github.com/cyverse-de/p/go/qms"
 	"github.com/cyverse-de/subscriptions/db"
 	"github.com/cyverse-de/subscriptions/errors"
+	"github.com/labstack/echo/v4"
 	"github.com/sirupsen/logrus"
 )
 
@@ -85,42 +87,53 @@ func (a *App) GetUserSummary(ctx context.Context, username string) (*qms.Subscri
 	return subscription.ToQMSSubscription(), nil
 }
 
+func (a *App) getUserSummary(ctx context.Context, request *qms.RequestByUsername) *qms.SubscriptionResponse {
+	response := pbinit.NewSubscriptionResponse()
+
+	username, err := a.FixUsername(request.Username)
+	if err != nil {
+		response.Error = errors.NatsError(ctx, err)
+		return response
+	}
+
+	subscription, err := a.GetUserSummary(ctx, username)
+	if err != nil {
+		response.Error = errors.NatsError(ctx, err)
+		return response
+	}
+
+	response.Subscription = subscription
+
+	return response
+}
+
 func (a *App) GetUserSummaryHandler(subject, reply string, request *qms.RequestByUsername) {
 	var err error
 
 	log := log.WithFields(logrus.Fields{"context": "user summary"})
 
-	response := pbinit.NewSubscriptionResponse()
-
 	ctx, span := pbinit.InitQMSRequestByUsername(request, subject)
 	defer span.End()
 
-	sendError := func(ctx context.Context, response *qms.SubscriptionResponse, err error) {
-		log.Error(err)
-		response.Error = errors.NatsError(ctx, err)
-		if err = a.client.Respond(ctx, reply, response); err != nil {
-			log.Error(err)
-		}
-	}
+	response := a.getUserSummary(ctx, request)
 
-	username, err := a.FixUsername(request.Username)
-	if err != nil {
-		sendError(ctx, response, err)
-		return
-	}
-
-	log = log.WithFields(logrus.Fields{"user": username})
-
-	subscription, err := a.GetUserSummary(ctx, username)
-	if err != nil {
-		sendError(ctx, response, err)
-		return
-	}
-
-	log.Warnf("Reply: %s", reply)
-
-	response.Subscription = subscription
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
+}
+
+func (a *App) GetUserSummaryHTTPHandler(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	request := &qms.RequestByUsername{
+		Username: c.Param("user"),
+	}
+
+	response := a.getUserSummary(ctx, request)
+
+	if response.Error != nil {
+		return c.JSON(int(response.Error.StatusCode), response)
+	}
+
+	return c.JSON(http.StatusOK, response)
 }

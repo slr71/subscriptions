@@ -2,47 +2,31 @@ package app
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/cyverse-de/go-mod/pbinit"
 	"github.com/cyverse-de/p/go/qms"
 	"github.com/cyverse-de/subscriptions/db"
 	"github.com/cyverse-de/subscriptions/errors"
 	"github.com/cyverse-de/subscriptions/utils"
+	"github.com/labstack/echo/v4"
 	"github.com/sirupsen/logrus"
 )
 
-func (a *App) AddUserHandler(subject, reply string, request *qms.AddUserRequest) {
-	var (
-		err error
-	)
-
-	log := log.WithField("context", "add user")
-
-	ctx, span := pbinit.InitQMSAddUserRequest(request, subject)
-	defer span.End()
-
+func (a *App) addUser(ctx context.Context, request *qms.AddUserRequest) *qms.AddUserResponse {
 	response := pbinit.NewQMSAddUserResponse()
-
-	sendError := func(ctx context.Context, response *qms.AddUserResponse, err error) {
-		log.Error(err)
-		response.Error = errors.NatsError(ctx, err)
-		if err = a.client.Respond(ctx, reply, response); err != nil {
-			log.Error(err)
-		}
-	}
-
 	username, err := a.FixUsername(request.Username)
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = errors.NatsError(ctx, err)
+		return response
 	}
 
 	d := db.New(a.db)
 
 	opts, err := utils.OptsForValues(request.Paid, request.Periods, request.EndDate)
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = errors.NatsError(ctx, err)
+		return response
 	}
 	log = log.WithFields(
 		logrus.Fields{
@@ -56,8 +40,8 @@ func (a *App) AddUserHandler(subject, reply string, request *qms.AddUserRequest)
 
 	tx, err := d.Begin()
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = errors.NatsError(ctx, err)
+		return response
 	}
 	defer func() {
 		_ = tx.Rollback()
@@ -68,15 +52,15 @@ func (a *App) AddUserHandler(subject, reply string, request *qms.AddUserRequest)
 
 	plan, err := d.GetPlanByName(ctx, planName, db.WithTX(tx))
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = errors.NatsError(ctx, err)
+		return response
 	}
 
 	// look for an existing user.
 	userExists, err := d.UserExists(ctx, username, db.WithTX(tx))
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = errors.NatsError(ctx, err)
+		return response
 	}
 
 	var userID string
@@ -85,14 +69,14 @@ func (a *App) AddUserHandler(subject, reply string, request *qms.AddUserRequest)
 	if !userExists {
 		userID, err = d.AddUser(ctx, username, db.WithTX(tx))
 		if err != nil {
-			sendError(ctx, response, err)
-			return
+			response.Error = errors.NatsError(ctx, err)
+			return response
 		}
 	} else {
 		userID, err = d.GetUserID(ctx, username, db.WithTX(tx))
 		if err != nil {
-			sendError(ctx, response, err)
-			return
+			response.Error = errors.NatsError(ctx, err)
+			return response
 		}
 	}
 
@@ -103,8 +87,8 @@ func (a *App) AddUserHandler(subject, reply string, request *qms.AddUserRequest)
 	if !createSubscription {
 		hasPlan, err := d.UserHasActivePlan(ctx, username, db.WithTX(tx))
 		if err != nil {
-			sendError(ctx, response, err)
-			return
+			response.Error = errors.NatsError(ctx, err)
+			return response
 		}
 		createSubscription = !hasPlan
 	}
@@ -113,8 +97,8 @@ func (a *App) AddUserHandler(subject, reply string, request *qms.AddUserRequest)
 	if !createSubscription {
 		onPlan, err := d.UserOnPlan(ctx, username, plan.Name, db.WithTX(tx))
 		if err != nil {
-			sendError(ctx, response, err)
-			return
+			response.Error = errors.NatsError(ctx, err)
+			return response
 		}
 		createSubscription = !onPlan
 	}
@@ -122,15 +106,15 @@ func (a *App) AddUserHandler(subject, reply string, request *qms.AddUserRequest)
 	// Create the subscription if we're supposed to.
 	if createSubscription {
 		if _, err = d.SetActiveSubscription(ctx, userID, plan, opts, db.WithTX(tx)); err != nil {
-			sendError(ctx, response, err)
-			return
+			response.Error = errors.NatsError(ctx, err)
+			return response
 		}
 	}
 
 	// Commit all of the changes
 	if err = tx.Commit(); err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = errors.NatsError(ctx, err)
+		return response
 	}
 
 	response.PlanName = plan.Name
@@ -138,7 +122,49 @@ func (a *App) AddUserHandler(subject, reply string, request *qms.AddUserRequest)
 	response.Username = username
 	response.Uuid = userID
 
+	return response
+}
+
+func (a *App) AddUserHandler(subject, reply string, request *qms.AddUserRequest) {
+	var err error
+
+	log := log.WithField("context", "add user")
+
+	ctx, span := pbinit.InitQMSAddUserRequest(request, subject)
+	defer span.End()
+
+	response := a.addUser(ctx, request)
+
+	if response.Error != nil {
+		log.Error(response.Error.Message)
+	}
+
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
+}
+
+func (a *App) AddUserHTTPHandler(c echo.Context) error {
+	var (
+		err     error
+		request qms.AddUserRequest
+	)
+
+	ctx := c.Request().Context()
+
+	if err = c.Bind(&request); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"message": "bad request",
+		})
+	}
+
+	request.Username = c.Param("username")
+
+	response := a.addUser(ctx, &request)
+
+	if response.Error != nil {
+		return c.JSON(int(response.Error.StatusCode), response)
+	}
+
+	return c.JSON(http.StatusOK, response)
 }

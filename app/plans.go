@@ -3,44 +3,23 @@ package app
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/cyverse-de/go-mod/pbinit"
 	"github.com/cyverse-de/p/go/qms"
 	"github.com/cyverse-de/subscriptions/db"
 	"github.com/cyverse-de/subscriptions/errors"
-	"github.com/sirupsen/logrus"
+	"github.com/labstack/echo/v4"
 )
 
-func (a *App) sendPlanResponseError(reply string, log *logrus.Entry) func(context.Context, *qms.PlanResponse, error) {
-	return func(ctx context.Context, response *qms.PlanResponse, err error) {
-		log.Error(err)
-		response.Error = errors.NatsError(ctx, err)
-		if err = a.client.Respond(ctx, reply, response); err != nil {
-			log.Error(err)
-		}
-	}
-}
-
-func (a *App) ListPlansHandler(subject, reply string, request *qms.NoParamsRequest) {
-	log := log.WithField("context", "list plans")
-
-	sendError := func(ctx context.Context, response *qms.PlanList, err error) {
-		log.Error(err)
-		response.Error = errors.NatsError(ctx, err)
-		if err = a.client.Respond(ctx, reply, response); err != nil {
-			log.Error(err)
-		}
-	}
-
+func (a *App) listPlans(ctx context.Context) *qms.PlanList {
 	response := pbinit.NewPlanList()
-	ctx, span := pbinit.InitQMSNoParamsRequest(request, subject)
-	defer span.End()
 
 	d := db.New(a.db)
 	plans, err := d.ListPlans(ctx)
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = errors.NatsError(ctx, err)
+		return response
 	}
 
 	for _, p := range plans {
@@ -66,19 +45,41 @@ func (a *App) ListPlansHandler(subject, reply string, request *qms.NoParamsReque
 		response.Plans = append(response.Plans, newP)
 	}
 
+	return response
+}
+
+func (a *App) ListPlansHandler(subject, reply string, request *qms.NoParamsRequest) {
+	var err error
+	log := log.WithField("context", "list plans")
+
+	ctx, span := pbinit.InitQMSNoParamsRequest(request, subject)
+	defer span.End()
+
+	response := a.listPlans(ctx)
+
+	if response.Error != nil {
+		log.Error(response.Error.Message)
+	}
+
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
 }
 
-func (a *App) AddPlanHandler(subject, reply string, request *qms.AddPlanRequest) {
-	log := log.WithField("context", "list plans")
+func (a *App) ListPlansHTTPHandler(c echo.Context) error {
+	ctx := c.Request().Context()
 
-	sendError := a.sendPlanResponseError(reply, log)
+	response := a.listPlans(ctx)
 
+	if response.Error != nil {
+		return c.JSON(int(response.Error.StatusCode), response)
+	}
+
+	return c.JSON(http.StatusOK, response)
+}
+
+func (a *App) addPlan(ctx context.Context, request *qms.AddPlanRequest) *qms.PlanResponse {
 	response := pbinit.NewPlanResponse()
-	ctx, span := pbinit.InitQMSAddPlanRequest(request, subject)
-	defer span.End()
 
 	d := db.New(a.db)
 
@@ -86,8 +87,8 @@ func (a *App) AddPlanHandler(subject, reply string, request *qms.AddPlanRequest)
 	var newPlanID string
 	tx, err := d.Begin()
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = errors.NatsError(ctx, err)
+		return response
 	}
 	err = tx.Wrap(func() error {
 		var err error
@@ -111,34 +112,68 @@ func (a *App) AddPlanHandler(subject, reply string, request *qms.AddPlanRequest)
 
 		return err
 	})
+
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = errors.NatsError(ctx, err)
+		return response
 	}
 
 	response.Plan = request.Plan
 	response.Plan.Uuid = newPlanID
+
+	return response
+}
+
+func (a *App) AddPlanHandler(subject, reply string, request *qms.AddPlanRequest) {
+	var err error
+	log := log.WithField("context", "list plans")
+
+	ctx, span := pbinit.InitQMSAddPlanRequest(request, subject)
+	defer span.End()
+
+	response := a.addPlan(ctx, request)
+
+	if response.Error != nil {
+		log.Error(response.Error.Message)
+	}
 
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
 }
 
-func (a *App) GetPlanHandler(subject, reply string, request *qms.PlanRequest) {
-	log := log.WithField("context", "get plan")
+func (a *App) AddPlanHTTPHandler(c echo.Context) error {
+	var (
+		err     error
+		request qms.AddPlanRequest
+	)
 
-	sendError := a.sendPlanResponseError(reply, log)
+	ctx := c.Request().Context()
 
+	if err = c.Bind(&request); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"message": "bad request",
+		})
+	}
+
+	response := a.addPlan(ctx, &request)
+
+	if response.Error != nil {
+		return c.JSON(int(response.Error.StatusCode), response)
+	}
+
+	return c.JSON(http.StatusOK, response)
+}
+
+func (a *App) getPlan(ctx context.Context, request *qms.PlanRequest) *qms.PlanResponse {
 	response := pbinit.NewPlanResponse()
-	ctx, span := pbinit.InitQMSPlanRequest(request, subject)
-	defer span.End()
 
 	d := db.New(a.db)
 
 	plan, err := d.GetPlanByID(ctx, request.PlanId)
 	if err != nil {
-		sendError(ctx, response, err)
-		return
+		response.Error = errors.NatsError(ctx, err)
+		return response
 	}
 
 	response.Plan = &qms.Plan{
@@ -162,21 +197,84 @@ func (a *App) GetPlanHandler(subject, reply string, request *qms.PlanRequest) {
 			})
 	}
 
+	return response
+}
+
+func (a *App) GetPlanHandler(subject, reply string, request *qms.PlanRequest) {
+	var err error
+	log := log.WithField("context", "get plan")
+
+	ctx, span := pbinit.InitQMSPlanRequest(request, subject)
+	defer span.End()
+
+	response := a.getPlan(ctx, request)
+
+	if response.Error != nil {
+		log.Error(response.Error.Message)
+	}
+
 	if err = a.client.Respond(ctx, reply, response); err != nil {
 		log.Error(err)
 	}
 }
 
-func (a *App) UpsertQuotaDefaultsHandler(subject, reply string, request *qms.AddPlanQuotaDefaultRequest) {
-	sendError := func(ctx context.Context, response *qms.QuotaDefaultResponse, err error) {
-		log.Error(err)
-		response.Error = errors.NatsError(ctx, err)
-		if err = a.client.Respond(ctx, reply, response); err != nil {
-			log.Error(err)
-		}
+func (a *App) GetPlanHTTPHandler(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	request := &qms.PlanRequest{
+		PlanId: c.Param("plan_id"),
 	}
+
+	response := a.getPlan(ctx, request)
+
+	if response.Error != nil {
+		return c.JSON(int(response.Error.StatusCode), response)
+	}
+
+	return c.JSON(http.StatusOK, response)
+}
+
+func (a *App) upsertQuotaDefault(ctx context.Context, _ *qms.AddPlanQuotaDefaultRequest) *qms.QuotaDefaultResponse {
 	response := pbinit.NewQuotaDefaultResponse()
+	response.Error = errors.NatsError(ctx, fmt.Errorf("not implemented"))
+	return response
+}
+
+func (a *App) UpsertQuotaDefaultsHandler(subject, reply string, request *qms.AddPlanQuotaDefaultRequest) {
+	var err error
+
 	ctx, span := pbinit.InitQMSAddPlanQuotaDefaultRequest(request, subject)
 	defer span.End()
-	sendError(ctx, response, fmt.Errorf("not implemented"))
+
+	response := a.upsertQuotaDefault(ctx, request)
+	if response.Error != nil {
+		log.Error(response.Error.Message)
+	}
+
+	if err = a.client.Respond(ctx, reply, response); err != nil {
+		log.Error(err)
+	}
+}
+
+func (a *App) UpsertQuotaDefaultsHTTPHandler(c echo.Context) error {
+	var (
+		err     error
+		request qms.AddPlanQuotaDefaultRequest
+	)
+
+	ctx := c.Request().Context()
+
+	if err = c.Bind(&request); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"message": "bad request",
+		})
+	}
+
+	response := a.upsertQuotaDefault(ctx, &request)
+
+	if response.Error != nil {
+		return c.JSON(int(response.Error.StatusCode), response)
+	}
+
+	return c.JSON(http.StatusOK, response)
 }
