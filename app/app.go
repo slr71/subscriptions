@@ -89,7 +89,13 @@ func New(client *natscl.Client, db *sqlx.DB, userSuffix string) *App {
 }
 
 func (a *App) FixUsername(username string) (string, error) {
-	u := strings.TrimSuffix(username, a.userSuffix)
+	var trimSuffix string
+	if strings.HasPrefix("@", a.userSuffix) {
+		trimSuffix = a.userSuffix
+	} else {
+		trimSuffix = fmt.Sprintf("@%s", a.userSuffix)
+	}
+	u := strings.TrimSuffix(username, trimSuffix)
 	if u == "" {
 		return "", errors.ErrInvalidUsername
 	}
