@@ -103,14 +103,12 @@ func NewConnection(settings *ConnectionSettings) (*nats.EncodedConn, error) {
 type Client struct {
 	conn          *nats.EncodedConn
 	subscriptions []*nats.Subscription
-	userSuffix    string
 	queueSuffix   string
 }
 
-func NewClient(conn *nats.EncodedConn, userSuffix, queueSuffix string) *Client {
+func NewClient(conn *nats.EncodedConn, queueSuffix string) *Client {
 	return &Client{
 		conn:          conn,
-		userSuffix:    userSuffix,
 		queueSuffix:   queueSuffix,
 		subscriptions: make([]*nats.Subscription, 0),
 	}

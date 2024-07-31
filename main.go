@@ -95,7 +95,7 @@ func main() {
 		log.Fatal(errors.Wrap(err, "Can't parse database.uri in the config file"))
 	}
 
-	userSuffix := config.String("users.domain")
+	userSuffix := strings.Trim(config.String("users.domain"), "@")
 	if userSuffix == "" {
 		log.Fatal("users.domain must be set in the configuration file")
 	}
@@ -139,7 +139,7 @@ func main() {
 	log.Infof("NATS queue is %s", *natsQueue)
 	log.Infof("--report-overages is %t", *reportOverages)
 
-	natsClient := natscl.NewClient(natsConn, userSuffix, serviceName)
+	natsClient := natscl.NewClient(natsConn, serviceName)
 
 	a := app.New(natsClient, dbconn, userSuffix)
 
