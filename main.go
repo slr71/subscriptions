@@ -100,6 +100,8 @@ func main() {
 		log.Fatal("users.domain must be set in the configuration file")
 	}
 
+	log.Infof("username suffix is configured as %s", userSuffix)
+
 	natsCluster := config.String("nats.cluster")
 	if natsCluster == "" {
 		log.Fatalf("The %sNATS_CLUSTER environment variable or nats.cluster configuration value must be set", *envPrefix)

@@ -31,13 +31,14 @@ func (a *App) GetUserSummary(ctx context.Context, username string) (*qms.Subscri
 		return nil, err
 	}
 	err = tx.Wrap(func() error {
-		log.Debug("before getting the active user plan")
+		log.Debugf("before getting the active user plan: %s", username)
+
 		subscription, err = d.GetActiveSubscription(ctx, username, db.WithTX(tx))
 		if err != nil {
 			log.Errorf("unable to get the active user plan: %s", err)
 			return err
 		}
-		log.Debug("after getting the active user plan")
+		log.Debugf("after getting the active user plan: %s", username)
 
 		if subscription == nil || subscription.ID == "" {
 			user, err := d.EnsureUser(ctx, username, db.WithTX(tx))
