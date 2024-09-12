@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strings"
+	"regexp"
 
 	"github.com/cyverse-de/go-mod/logging"
 	"github.com/cyverse-de/go-mod/pbinit"
@@ -89,17 +89,12 @@ func New(client *natscl.Client, db *sqlx.DB, userSuffix string) *App {
 }
 
 func (a *App) FixUsername(username string) (string, error) {
-	var trimSuffix string
-	if strings.HasPrefix(a.userSuffix, "@") {
-		trimSuffix = a.userSuffix
-	} else {
-		trimSuffix = fmt.Sprintf("@%s", a.userSuffix)
+
+	re, err := regexp.Compile(`@.*$`)
+	if err != nil {
+		return "", err
 	}
-	u := strings.TrimSuffix(username, trimSuffix)
-	if u == "" {
-		return "", errors.ErrInvalidUsername
-	}
-	return u, nil
+	return re.ReplaceAllString(username, ""), nil
 }
 
 func (a *App) validateUpdate(request *qms.AddUpdateRequest) (string, error) {
