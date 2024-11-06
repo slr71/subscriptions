@@ -223,26 +223,33 @@ func (p Plan) ToQMSPlan() *qms.Plan {
 }
 
 type PlanQuotaDefault struct {
-	ID           string       `db:"id" goqu:"defaultifempty"`
-	PlanID       string       `db:"plan_id"`
-	QuotaValue   float64      `db:"quota_value"`
-	ResourceType ResourceType `db:"resource_types"`
+	ID            string       `db:"id" goqu:"defaultifempty"`
+	PlanID        string       `db:"plan_id"`
+	QuotaValue    float64      `db:"quota_value"`
+	ResourceType  ResourceType `db:"resource_types"`
+	EffectiveDate time.Time    `db:"effective_date"`
 }
 
 func NewPlanQuotaDefaultFromQMS(q *qms.QuotaDefault, planID string) *PlanQuotaDefault {
+	var effectiveDate time.Time
+	if q.EffectiveDate != nil {
+		effectiveDate = q.EffectiveDate.AsTime()
+	}
 	return &PlanQuotaDefault{
-		ID:           q.Uuid,
-		PlanID:       planID,
-		QuotaValue:   q.QuotaValue,
-		ResourceType: *NewResourceTypeFromQMS(q.ResourceType),
+		ID:            q.Uuid,
+		PlanID:        planID,
+		QuotaValue:    q.QuotaValue,
+		ResourceType:  *NewResourceTypeFromQMS(q.ResourceType),
+		EffectiveDate: effectiveDate,
 	}
 }
 
 func (pqd PlanQuotaDefault) ToQMSQuotaDefault() *qms.QuotaDefault {
 	return &qms.QuotaDefault{
-		Uuid:         pqd.ID,
-		QuotaValue:   pqd.QuotaValue,
-		ResourceType: pqd.ResourceType.ToQMSResourceType(),
+		Uuid:          pqd.ID,
+		QuotaValue:    pqd.QuotaValue,
+		ResourceType:  pqd.ResourceType.ToQMSResourceType(),
+		EffectiveDate: timestamppb.New(pqd.EffectiveDate),
 	}
 }
 

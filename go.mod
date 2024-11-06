@@ -1,8 +1,12 @@
 module github.com/cyverse-de/subscriptions
 
-go 1.22.0
+go 1.23.2
 
-toolchain go1.23.2
+replace github.com/cyverse-de/p/go/qms => /Users/sarahr/src/de/libs/p/go/qms
+
+replace github.com/cyverse-de/p/go/requests => /Users/sarahr/src/de/libs/p/go/requests
+
+replace github.com/cyverse-de/p/go/svcerror => /Users/sarahr/src/de/libs/p/go/svcerror
 
 require (
 	github.com/cyverse-de/go-mod/cfg v0.0.2
@@ -54,9 +58,9 @@ require (
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/nats-io/nkeys v0.4.7 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
+	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
-	go.opentelemetry.io/otel/exporters/jaeger v1.17.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.31.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.31.0 // indirect
 	go.opentelemetry.io/otel/metric v1.31.0 // indirect
@@ -64,7 +68,6 @@ require (
 	go.opentelemetry.io/otel/trace v1.31.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.3.1 // indirect
 	golang.org/x/crypto v0.28.0 // indirect
-	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c // indirect
 	golang.org/x/net v0.30.0 // indirect
 	golang.org/x/sys v0.26.0 // indirect
 	golang.org/x/text v0.19.0 // indirect
