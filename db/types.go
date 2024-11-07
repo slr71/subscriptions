@@ -132,6 +132,7 @@ type Subscription struct {
 	LastModifiedBy     string    `db:"last_modified_by"`
 	LastModifiedAt     string    `db:"last_modified_at" goqu:"defaultifempty"`
 	Paid               bool      `db:"paid" goqu:"defaultifempty"`
+	Rate               PlanRate  `db:"plan_rates"`
 }
 
 func NewSubscriptionFromQMS(s *qms.Subscription) *Subscription {
@@ -159,6 +160,7 @@ func NewSubscriptionFromQMS(s *qms.Subscription) *Subscription {
 		CreatedBy:      s.User.Username,
 		LastModifiedBy: s.User.Username,
 		Paid:           s.Paid,
+		Rate:           *NewPlanRateFromQMS(s.PlanRate, s.Plan.Uuid),
 	}
 }
 
@@ -169,7 +171,7 @@ func (up Subscription) ToQMSSubscription() *qms.Subscription {
 		quotas[i] = quota.ToQMSQuota()
 	}
 
-	// Convert th elist of usages.
+	// Convert the list of usages.
 	usages := make([]*qms.Usage, len(up.Usages))
 	for i, usage := range up.Usages {
 		usages[i] = usage.ToQMSUsage()
@@ -184,6 +186,7 @@ func (up Subscription) ToQMSSubscription() *qms.Subscription {
 		Quotas:             quotas,
 		Usages:             usages,
 		Paid:               up.Paid,
+		PlanRate:           up.Rate.ToQMSPlanRate(),
 	}
 }
 
@@ -192,18 +195,24 @@ type Plan struct {
 	Name          string             `db:"name"`
 	Description   string             `db:"description"`
 	QuotaDefaults []PlanQuotaDefault `db:"-"`
+	Rates         []PlanRate         `db:"-"`
 }
 
 func NewPlanFromQMS(q *qms.Plan) *Plan {
-	pqd := make([]PlanQuotaDefault, 0)
-	for _, qd := range q.PlanQuotaDefaults {
-		pqd = append(pqd, *NewPlanQuotaDefaultFromQMS(qd, q.Uuid))
+	pqd := make([]PlanQuotaDefault, len(q.PlanQuotaDefaults))
+	for i, qd := range q.PlanQuotaDefaults {
+		pqd[i] = *NewPlanQuotaDefaultFromQMS(qd, q.Uuid)
+	}
+	pr := make([]PlanRate, len(q.PlanRates))
+	for i, r := range q.PlanRates {
+		pr[i] = *NewPlanRateFromQMS(r, q.Uuid)
 	}
 	return &Plan{
 		ID:            q.Uuid,
 		Name:          q.Name,
 		Description:   q.Description,
 		QuotaDefaults: pqd,
+		Rates:         pr,
 	}
 }
 
@@ -213,12 +222,17 @@ func (p Plan) ToQMSPlan() *qms.Plan {
 	for i, quotaDefault := range p.QuotaDefaults {
 		quotaDefaults[i] = quotaDefault.ToQMSQuotaDefault()
 	}
+	rates := make([]*qms.PlanRate, len(p.Rates))
+	for i, rate := range p.Rates {
+		rates[i] = rate.ToQMSPlanRate()
+	}
 
 	return &qms.Plan{
 		Uuid:              p.ID,
 		Name:              p.Name,
 		Description:       p.Description,
 		PlanQuotaDefaults: quotaDefaults,
+		PlanRates:         rates,
 	}
 }
 
@@ -250,6 +264,34 @@ func (pqd PlanQuotaDefault) ToQMSQuotaDefault() *qms.QuotaDefault {
 		QuotaValue:    pqd.QuotaValue,
 		ResourceType:  pqd.ResourceType.ToQMSResourceType(),
 		EffectiveDate: timestamppb.New(pqd.EffectiveDate),
+	}
+}
+
+type PlanRate struct {
+	ID            string    `db:"id" goqu:"defaultifempty"`
+	PlanID        string    `db:"plan_id"`
+	EffectiveDate time.Time `db:"effective_date"`
+	Rate          float64   `db:"rate"`
+}
+
+func NewPlanRateFromQMS(r *qms.PlanRate, planID string) *PlanRate {
+	var effectiveDate time.Time
+	if r.EffectiveDate != nil {
+		effectiveDate = r.EffectiveDate.AsTime()
+	}
+	return &PlanRate{
+		ID:            r.Uuid,
+		PlanID:        planID,
+		EffectiveDate: effectiveDate,
+		Rate:          r.Rate,
+	}
+}
+
+func (pr PlanRate) ToQMSPlanRate() *qms.PlanRate {
+	return &qms.PlanRate{
+		Uuid:          pr.ID,
+		EffectiveDate: timestamppb.New(pr.EffectiveDate),
+		Rate:          pr.Rate,
 	}
 }
 

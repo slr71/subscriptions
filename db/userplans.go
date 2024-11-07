@@ -44,9 +44,14 @@ func subscriptionDS(db GoquDatabase) *goqu.SelectDataset {
 			t.Plans.Col("id").As(goqu.C("plans.id")),
 			t.Plans.Col("name").As(goqu.C("plans.name")),
 			t.Plans.Col("description").As(goqu.C("plans.description")),
+
+			t.PlanRates.Col("id").As(goqu.C("plan_rates.id")),
+			t.PlanRates.Col("effective_date").As(goqu.C("plan_rates.effective_date")),
+			t.PlanRates.Col("rate").As(goqu.C("plan_rates.rate")),
 		).
 		Join(t.Users, goqu.On(t.Subscriptions.Col("user_id").Eq(t.Users.Col("id")))).
-		Join(t.Plans, goqu.On(t.Subscriptions.Col("plan_id").Eq(t.Plans.Col("id"))))
+		Join(t.Plans, goqu.On(t.Subscriptions.Col("plan_id").Eq(t.Plans.Col("id")))).
+		Join(t.PlanRates, goqu.On(t.Subscriptions.Col("plan_rate_id").Eq(t.PlanRates.Col("id"))))
 }
 
 func (d *Database) GetSubscriptionByID(ctx context.Context, subscriptionID string, opts ...QueryOption) (*Subscription, error) {
@@ -262,6 +267,33 @@ func (d *Database) SubscriptionUsages(ctx context.Context, subscriptionID string
 	return usages, nil
 }
 
+// SubscriptionPlanRates returns a list of rates assocaited with a user plan specified by the passed in UUID. Accepts a
+// variable number of QueryOptions, though only WithTX is currently supported.
+func (d *Database) SubscriptionPlanRates(ctx context.Context, planID string, opts ...QueryOption) ([]PlanRate, error) {
+	var (
+		err   error
+		db    GoquDatabase
+		rates []PlanRate
+	)
+
+	_, db = d.querySettings(opts...)
+
+	ratesQuery := db.From(t.PlanRates).
+		Select(
+			t.PlanRates.Col("id").As("id"),
+			t.PlanRates.Col("plan_id").As("plan_id"),
+			t.PlanRates.Col("effective_date").As("effective_date"),
+			t.PlanRates.Col("rate").As("rate"),
+		).
+		Where(t.PlanRates.Col("plan_id").Eq(planID))
+	d.LogSQL(ratesQuery)
+
+	if err = ratesQuery.Executor().ScanStructsContext(ctx, &rates); err != nil {
+		return nil, err
+	}
+	return rates, nil
+}
+
 // SubscriptionQuotas returns a list of t.Quotas associated with the user plan specified
 // by the UUID passed in. Accepts a variable number of QueryOptions, though only
 // WithTX is currently supported.
@@ -342,28 +374,28 @@ func (d *Database) LoadSubscriptionDetails(ctx context.Context, subscription *Su
 		quotas   []Quota
 	)
 
-	log.Debug("before getting user plan quota defaults")
 	defaults, err = d.SubscriptionQuotaDefaults(ctx, subscription.Plan.ID, opts...)
 	if err != nil {
 		return err
 	}
-	log.Debug("after getting user plan quota defaults")
 
-	log.Debug("before getting user plan t.Quotas")
 	quotas, err = d.SubscriptionQuotas(ctx, subscription.ID, opts...)
 	if err != nil {
 		return err
 	}
-	log.Debug("after getting user plan t.Quotas")
 
-	log.Debug("before getting user plan usages")
 	usages, err = d.SubscriptionUsages(ctx, subscription.ID, opts...)
 	if err != nil {
 		return err
 	}
-	log.Debug("after getting user plan usages")
+
+	planRates, err := d.SubscriptionPlanRates(ctx, subscription.Plan.ID)
+	if err != nil {
+		return err
+	}
 
 	subscription.Plan.QuotaDefaults = defaults
+	subscription.Plan.Rates = planRates
 	subscription.Quotas = quotas
 	subscription.Usages = usages
 
