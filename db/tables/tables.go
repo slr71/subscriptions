@@ -10,7 +10,6 @@ var (
 	SubscriptionAddons = goqu.T("subscription_addons")
 	Plans              = goqu.T("plans")
 	PlanQuotaDefaults  = goqu.T("plan_quota_defaults")
-	PlanRates          = goqu.T("plan_rates")
 	PQD                = PlanQuotaDefaults
 	ResourceTypes      = goqu.T("resource_types")
 	RT                 = ResourceTypes
@@ -18,4 +17,5 @@ var (
 	Usages             = goqu.T("usages")
 	Updates            = goqu.T("updates")
 	Addons             = goqu.T("addons")
+	PlanRates          = goqu.T("plan_rates")
 )

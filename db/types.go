@@ -236,6 +236,41 @@ func (p Plan) ToQMSPlan() *qms.Plan {
 	}
 }
 
+func (p Plan) GetActiveRate() *PlanRate {
+	now := time.Now()
+
+	var effectiveRate *PlanRate
+	for _, pr := range p.Rates {
+		if pr.EffectiveDate.After(now) {
+			break
+		}
+		effectiveRate = &pr
+	}
+
+	return effectiveRate
+}
+
+func (p Plan) GetActiveQuotaDefaults() []*PlanQuotaDefault {
+	now := time.Now()
+
+	pqdMap := make(map[string]*PlanQuotaDefault)
+	for _, pqd := range p.QuotaDefaults {
+		if pqd.EffectiveDate.After(now) {
+			break
+		}
+		pqdMap[pqd.ResourceType.Name] = &pqd
+	}
+
+	index := 0
+	pqds := make([]*PlanQuotaDefault, len(pqdMap))
+	for _, pqd := range pqdMap {
+		pqds[index] = pqd
+		index++
+	}
+
+	return pqds
+}
+
 type PlanQuotaDefault struct {
 	ID            string       `db:"id" goqu:"defaultifempty"`
 	PlanID        string       `db:"plan_id"`

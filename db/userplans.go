@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	t "github.com/cyverse-de/subscriptions/db/tables"
@@ -120,6 +121,12 @@ func (d *Database) SetActiveSubscription(
 	n := time.Now()
 	e := subscriptionOpts.EndDate
 
+	// Get the active plan rate.
+	activePlanRate := plan.GetActiveRate()
+	if activePlanRate == nil {
+		return "", fmt.Errorf("the %s subscription plan has no effective rate", plan.Name)
+	}
+
 	query := db.Insert(t.Subscriptions).
 		Rows(
 			goqu.Record{
@@ -130,6 +137,7 @@ func (d *Database) SetActiveSubscription(
 				"created_by":           "de",
 				"last_modified_by":     "de",
 				"paid":                 subscriptionOpts.Paid,
+				"plan_rate_id":         activePlanRate.ID,
 			},
 		).
 		Returning(t.Subscriptions.Col("id"))
@@ -141,7 +149,7 @@ func (d *Database) SetActiveSubscription(
 	}
 
 	// Add the quota defaults as the t.Quotas for the user plan.
-	for _, quotaDefault := range plan.QuotaDefaults {
+	for _, quotaDefault := range plan.GetActiveQuotaDefaults() {
 		quotaValue := quotaDefault.QuotaValue * float64(subscriptionOpts.Periods)
 		if quotaDefault.ResourceType.Consumable {
 			quotaValue *= float64(subscriptionOpts.Periods)
