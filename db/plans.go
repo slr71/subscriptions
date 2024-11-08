@@ -110,7 +110,7 @@ func (d *Database) ListPlans(ctx context.Context, opts ...QueryOption) ([]Plan, 
 
 	// Load the details for each plan in the list.
 	for i := range plans {
-		err = d.loadPlanQuotaDefaults(ctx, &plans[i], opts...)
+		err = d.loadPlanDetails(ctx, &plans[i], opts...)
 		if err != nil {
 			return nil, err
 		}
@@ -138,7 +138,7 @@ func (d *Database) GetPlanByID(ctx context.Context, planID string, opts ...Query
 	}
 
 	// Load the plan details.
-	err = d.loadPlanQuotaDefaults(ctx, &plan, opts...)
+	err = d.loadPlanDetails(ctx, &plan, opts...)
 	if err != nil {
 		return nil, errors.Wrap(err, wrapMsg)
 	}

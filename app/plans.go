@@ -22,27 +22,9 @@ func (a *App) listPlans(ctx context.Context) *qms.PlanList {
 		return response
 	}
 
-	for _, p := range plans {
-		newP := &qms.Plan{
-			Uuid:              p.ID,
-			Name:              p.Name,
-			Description:       p.Description,
-			PlanQuotaDefaults: []*qms.QuotaDefault{},
-		}
-
-		for _, q := range p.QuotaDefaults {
-			newP.PlanQuotaDefaults = append(newP.PlanQuotaDefaults, &qms.QuotaDefault{
-				Uuid:       q.ID,
-				QuotaValue: q.QuotaValue,
-				ResourceType: &qms.ResourceType{
-					Uuid: q.ResourceType.ID,
-					Name: q.ResourceType.Name,
-					Unit: q.ResourceType.Unit,
-				},
-			})
-		}
-
-		response.Plans = append(response.Plans, newP)
+	response.Plans = make([]*qms.Plan, len(plans))
+	for i, p := range plans {
+		response.Plans[i] = p.ToQMSPlan()
 	}
 
 	return response
