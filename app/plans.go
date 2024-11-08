@@ -65,43 +65,30 @@ func (a *App) addPlan(ctx context.Context, request *qms.AddPlanRequest) *qms.Pla
 
 	d := db.New(a.db)
 
-	var qd []db.PlanQuotaDefault
-	var newPlanID string
 	tx, err := d.Begin()
 	if err != nil {
 		response.Error = errors.NatsError(ctx, err)
 		return response
 	}
 	err = tx.Wrap(func() error {
-		var err error
-
-		for _, pqd := range request.Plan.PlanQuotaDefaults {
-			qd = append(qd, db.PlanQuotaDefault{
-				QuotaValue: float64(pqd.QuotaValue),
-				ResourceType: db.ResourceType{
-					ID:   pqd.ResourceType.Uuid,
-					Name: pqd.ResourceType.Name,
-					Unit: pqd.ResourceType.Unit,
-				},
-			})
+		newPlanID, err := d.AddPlan(ctx, db.NewPlanFromQMS(request.Plan))
+		if err != nil {
+			return err
 		}
 
-		newPlanID, err = d.AddPlan(ctx, &db.Plan{
-			Name:          request.Plan.Name,
-			Description:   request.Plan.Description,
-			QuotaDefaults: qd,
-		}, db.WithTX(tx))
+		plan, err := d.GetPlanByID(ctx, newPlanID)
+		if err != nil {
+			return err
+		}
 
-		return err
+		response.Plan = plan.ToQMSPlan()
+		return nil
 	})
 
 	if err != nil {
 		response.Error = errors.NatsError(ctx, err)
 		return response
 	}
-
-	response.Plan = request.Plan
-	response.Plan.Uuid = newPlanID
 
 	return response
 }
