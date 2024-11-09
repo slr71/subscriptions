@@ -71,7 +71,20 @@ func (a *App) addPlan(ctx context.Context, request *qms.AddPlanRequest) *qms.Pla
 		return response
 	}
 	err = tx.Wrap(func() error {
-		newPlanID, err := d.AddPlan(ctx, db.NewPlanFromQMS(request.Plan))
+		incomingPlan := db.NewPlanFromQMS(request.Plan)
+		err := incomingPlan.Validate()
+		if err != nil {
+			return err
+		}
+
+		existingPlan, err := d.GetPlanByName(ctx, incomingPlan.Name)
+		if err != nil {
+			return err
+		} else if existingPlan != nil {
+			return fmt.Errorf("a plan named %s already exists", incomingPlan.Name)
+		}
+
+		newPlanID, err := d.AddPlan(ctx, incomingPlan)
 		if err != nil {
 			return err
 		}

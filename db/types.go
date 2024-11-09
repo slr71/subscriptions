@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/cyverse-de/p/go/qms"
@@ -48,6 +49,11 @@ const QuotasTrackedMetric = "quotas"
 
 const DefaultPlanName = "Basic"
 
+type PlanQuotaDefaultKey struct {
+	ResourceTypeID string
+	EffectiveDate  int64
+}
+
 type UpdateOperation struct {
 	ID   string `db:"id" goqu:"defaultifempty"`
 	Name string `db:"name"`
@@ -88,6 +94,16 @@ func NewResourceTypeFromQMS(q *qms.ResourceType) *ResourceType {
 		Unit:       q.Unit,
 		Consumable: q.Consumable,
 	}
+}
+
+func (rt ResourceType) ValidateForPlan() error {
+
+	// The resource type ID is required.
+	if rt.ID == "" {
+		return fmt.Errorf("a resource type ID is required")
+	}
+
+	return nil
 }
 
 var ResourceTypeNames = []string{
@@ -271,6 +287,55 @@ func (p Plan) GetActiveQuotaDefaults() []*PlanQuotaDefault {
 	return pqds
 }
 
+func (p Plan) Validate() error {
+
+	// The plan name and description are both required.
+	if p.Name == "" {
+		return fmt.Errorf("a plan name is required")
+	}
+	if p.Description == "" {
+		return fmt.Errorf("a plan description is required")
+	}
+
+	// Validate the quota defaults.
+	for _, qd := range p.QuotaDefaults {
+		if err := qd.ValidateForPlan(); err != nil {
+			return err
+		}
+	}
+
+	// Verify that there's only one quota default per resource type and effective date.
+	uniquePlanQuotaDefaults := make(map[PlanQuotaDefaultKey]bool)
+	for _, qd := range p.QuotaDefaults {
+		key := qd.Key()
+		if uniquePlanQuotaDefaults[key] {
+			return fmt.Errorf("there can only be one quota default for each resource type and effective date")
+		} else {
+			uniquePlanQuotaDefaults[key] = true
+		}
+	}
+
+	// Validate the plan rates.
+	for _, r := range p.Rates {
+		if err := r.ValidateForPlan(); err != nil {
+			return err
+		}
+	}
+
+	// Verify that there's only one rate per effective date.
+	uniquePlanRates := make(map[int64]bool)
+	for _, r := range p.Rates {
+		key := r.EffectiveDate.UnixMicro()
+		if uniquePlanRates[key] {
+			return fmt.Errorf("there can only be one plan rate for each effective date")
+		} else {
+			uniquePlanRates[key] = true
+		}
+	}
+
+	return nil
+}
+
 type PlanQuotaDefault struct {
 	ID            string       `db:"id" goqu:"defaultifempty"`
 	PlanID        string       `db:"plan_id"`
@@ -302,6 +367,28 @@ func (pqd PlanQuotaDefault) ToQMSQuotaDefault() *qms.QuotaDefault {
 	}
 }
 
+func (pqd PlanQuotaDefault) ValidateForPlan() error {
+
+	// The default quota value must be specified and greater than zero.
+	if pqd.QuotaValue <= 0 {
+		return fmt.Errorf("plan quota default values must be specified and greater than zero")
+	}
+
+	// The effective date must be specified.
+	if pqd.EffectiveDate.IsZero() {
+		return fmt.Errorf("all plan quota defaults must have an effective date")
+	}
+
+	return pqd.ResourceType.ValidateForPlan()
+}
+
+func (pqd PlanQuotaDefault) Key() PlanQuotaDefaultKey {
+	return PlanQuotaDefaultKey{
+		ResourceTypeID: pqd.ResourceType.ID,
+		EffectiveDate:  pqd.EffectiveDate.UnixMicro(),
+	}
+}
+
 type PlanRate struct {
 	ID            string    `db:"id" goqu:"defaultifempty"`
 	PlanID        string    `db:"plan_id"`
@@ -328,6 +415,25 @@ func (pr PlanRate) ToQMSPlanRate() *qms.PlanRate {
 		EffectiveDate: timestamppb.New(pr.EffectiveDate),
 		Rate:          pr.Rate,
 	}
+}
+
+func (pr PlanRate) Validate() error {
+
+	// The rate can't be negative.
+	if pr.Rate < 0 {
+		return fmt.Errorf("the plan rate must not be less than zero")
+	}
+
+	// The effective date has to be specified.
+	if pr.EffectiveDate.IsZero() {
+		return fmt.Errorf("the effective date of the plan rate must be specified")
+	}
+
+	return nil
+}
+
+func (pr PlanRate) ValidateForPlan() error {
+	return pr.Validate()
 }
 
 type Usage struct {
