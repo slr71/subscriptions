@@ -77,19 +77,19 @@ func (a *App) addPlan(ctx context.Context, request *qms.AddPlanRequest) *qms.Pla
 			return err
 		}
 
-		existingPlan, err := d.GetPlanByName(ctx, incomingPlan.Name)
+		existingPlan, err := d.GetPlanByName(ctx, incomingPlan.Name, db.WithTX(tx))
 		if err != nil {
 			return err
 		} else if existingPlan != nil {
 			return fmt.Errorf("a plan named %s already exists", incomingPlan.Name)
 		}
 
-		newPlanID, err := d.AddPlan(ctx, incomingPlan)
+		newPlanID, err := d.AddPlan(ctx, incomingPlan, db.WithTX(tx))
 		if err != nil {
 			return err
 		}
 
-		plan, err := d.GetPlanByID(ctx, newPlanID)
+		plan, err := d.GetPlanByID(ctx, newPlanID, db.WithTX(tx))
 		if err != nil {
 			return err
 		}

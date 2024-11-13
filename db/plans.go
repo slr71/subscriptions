@@ -191,18 +191,33 @@ func (d *Database) AddPlan(ctx context.Context, plan *Plan, opts ...QueryOption)
 	}
 
 	for _, pqd := range plan.QuotaDefaults {
-		newDS := db.Insert(t.PQD).
+		pqdDS := db.Insert(t.PQD).
 			Rows(
 				goqu.Record{
 					"plan_id":          newPlanID,
 					"resource_type_id": pqd.ResourceType.ID,
 					"quota_value":      pqd.QuotaValue,
+					"effective_date":   pqd.EffectiveDate,
 				},
 			).Executor()
 
-		if _, err := newDS.ExecContext(ctx); err !=
-			nil {
+		if _, err := pqdDS.ExecContext(ctx); err != nil {
 			return "", errors.Wrap(err, "unable to add plan quota defaults")
+		}
+	}
+
+	for _, pr := range plan.Rates {
+		prDS := db.Insert(t.PlanRates).
+			Rows(
+				goqu.Record{
+					"plan_id":        newPlanID,
+					"effective_date": pr.EffectiveDate,
+					"rate":           pr.Rate,
+				},
+			).Executor()
+
+		if _, err := prDS.ExecContext(ctx); err != nil {
+			return "", errors.Wrap(err, "unable to add plan rates")
 		}
 	}
 
