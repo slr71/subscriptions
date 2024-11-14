@@ -526,19 +526,29 @@ type Addon struct {
 	ResourceType  ResourceType `db:"resource_types"`
 	DefaultAmount float64      `db:"default_amount"`
 	DefaultPaid   bool         `db:"default_paid"`
+	AddonRates    []AddonRate  `db:"-"`
 }
 
 func NewAddonFromQMS(q *qms.Addon) *Addon {
+	addonRates := make([]AddonRate, len(q.AddonRates))
+	for i, r := range q.AddonRates {
+		addonRates[i] = *NewAddonRateFromQMS(r, q.Uuid)
+	}
 	return &Addon{
 		Name:          q.Name,
 		Description:   q.Description,
 		DefaultAmount: q.DefaultAmount,
 		DefaultPaid:   q.DefaultPaid,
 		ResourceType:  *NewResourceTypeFromQMS(q.ResourceType),
+		AddonRates:    addonRates,
 	}
 }
 
 func (a *Addon) ToQMSType() *qms.Addon {
+	addonRates := make([]*qms.AddonRate, len(a.AddonRates))
+	for i, r := range a.AddonRates {
+		addonRates[i] = r.ToQMSType()
+	}
 	return &qms.Addon{
 		Uuid:          a.ID,
 		Name:          a.Name,
@@ -550,6 +560,35 @@ func (a *Addon) ToQMSType() *qms.Addon {
 			Name: a.ResourceType.Name,
 			Unit: a.ResourceType.Unit,
 		},
+		AddonRates: addonRates,
+	}
+}
+
+type AddonRate struct {
+	ID            string    `db:"id" goqu:"defaultifempty,skipupdate"`
+	AddonID       string    `db:"addon_id"`
+	EffectiveDate time.Time `db:"effective_date"`
+	Rate          float64   `db:"rate"`
+}
+
+func NewAddonRateFromQMS(r *qms.AddonRate, addonID string) *AddonRate {
+	var effectiveDate time.Time
+	if r.EffectiveDate != nil {
+		effectiveDate = r.EffectiveDate.AsTime()
+	}
+	return &AddonRate{
+		ID:            r.Uuid,
+		AddonID:       addonID,
+		EffectiveDate: effectiveDate,
+		Rate:          r.Rate,
+	}
+}
+
+func (r *AddonRate) ToQMSType() *qms.AddonRate {
+	return &qms.AddonRate{
+		Uuid:          r.ID,
+		EffectiveDate: timestamppb.New(r.EffectiveDate),
+		Rate:          r.Rate,
 	}
 }
 

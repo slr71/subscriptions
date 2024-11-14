@@ -67,6 +67,7 @@ func (d *Database) GetAddonByID(ctx context.Context, addonID string, opts ...Que
 }
 
 func (d *Database) ListAddons(ctx context.Context, opts ...QueryOption) ([]Addon, error) {
+	wrapMsg := "unable to list addons"
 	_, db := d.querySettings(opts...)
 
 	ds := db.From(t.Addons).
@@ -86,10 +87,38 @@ func (d *Database) ListAddons(ctx context.Context, opts ...QueryOption) ([]Addon
 
 	var addons []Addon
 	if err := ds.ScanStructsContext(ctx, &addons); err != nil {
-		return nil, errors.Wrap(err, "unable to list addons")
+		return nil, errors.Wrap(err, wrapMsg)
+	}
+
+	for i, addon := range addons {
+		addonRates, err := d.ListRatesForAddon(ctx, addon.ID, opts...)
+		if err != nil {
+			return nil, errors.Wrap(err, wrapMsg)
+		}
+		addons[i].AddonRates = addonRates
 	}
 
 	return addons, nil
+}
+
+func (d *Database) ListRatesForAddon(ctx context.Context, addonID string, opts ...QueryOption) ([]AddonRate, error) {
+	_, db := d.querySettings(opts...)
+
+	ds := db.From(t.AddonRates).
+		Select(
+			t.AddonRates.Col("id"),
+			t.AddonRates.Col("addon_id"),
+			t.AddonRates.Col("effective_date"),
+			t.AddonRates.Col("rate"),
+		)
+	d.LogSQL(ds)
+
+	var addonRates []AddonRate
+	if err := ds.ScanStructsContext(ctx, &addonRates); err != nil {
+		return nil, errors.Wrapf(err, "unable to list rates for addon ID %s", addonID)
+	}
+
+	return addonRates, nil
 }
 
 func (d *Database) ToggleAddonPaid(ctx context.Context, addonID string, opts ...QueryOption) (*Addon, error) {
