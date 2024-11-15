@@ -84,6 +84,24 @@ func (a *App) addPlan(ctx context.Context, request *qms.AddPlanRequest) *qms.Pla
 			return fmt.Errorf("a plan named %s already exists", incomingPlan.Name)
 		}
 
+		for i, pqd := range incomingPlan.QuotaDefaults {
+			rt, err := d.LookupResoureType(ctx, &pqd.ResourceType, db.WithTX(tx))
+			if err != nil {
+				return err
+			}
+			incomingPlan.QuotaDefaults[i].ResourceType = *rt
+		}
+
+		err = incomingPlan.ValidateQuotaDefaultUniqueness()
+		if err != nil {
+			return err
+		}
+
+		err = incomingPlan.ValidatePlanRateUniqueness()
+		if err != nil {
+			return err
+		}
+
 		newPlanID, err := d.AddPlan(ctx, incomingPlan, db.WithTX(tx))
 		if err != nil {
 			return err

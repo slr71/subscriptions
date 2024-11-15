@@ -29,6 +29,22 @@ func (d *Database) AddAddon(ctx context.Context, addon *Addon, opts ...QueryOpti
 		return "", err
 	}
 
+	// Add the addon rates.
+	addonRateRows := make([]interface{}, len(addon.AddonRates))
+	for i, r := range addon.AddonRates {
+		addonRateRows[i] = goqu.Record{
+			"addon_id":       newAddonID,
+			"effective_date": r.EffectiveDate,
+			"rate":           r.Rate,
+		}
+	}
+	addonRateDS := db.Insert(t.AddonRates).
+		Rows(addonRateRows...).
+		Executor()
+	if _, err := addonRateDS.ExecContext(ctx); err != nil {
+		return "", err
+	}
+
 	return newAddonID, nil
 }
 

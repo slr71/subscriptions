@@ -98,9 +98,9 @@ func NewResourceTypeFromQMS(q *qms.ResourceType) *ResourceType {
 
 func (rt ResourceType) ValidateForPlan() error {
 
-	// The resource type ID is required.
-	if rt.ID == "" {
-		return fmt.Errorf("a resource type ID is required")
+	// We must have enough information to at least attempt to look up the resource type.
+	if rt.ID == "" && rt.Name == "" {
+		return fmt.Errorf("either the resource type name or the resource type ID is required")
 	}
 
 	return nil
@@ -304,6 +304,18 @@ func (p Plan) Validate() error {
 		}
 	}
 
+	// Validate the plan rates.
+	for _, r := range p.Rates {
+		if err := r.ValidateForPlan(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (p Plan) ValidateQuotaDefaultUniqueness() error {
+
 	// Verify that there's only one quota default per resource type and effective date.
 	uniquePlanQuotaDefaults := make(map[PlanQuotaDefaultKey]bool)
 	for _, qd := range p.QuotaDefaults {
@@ -315,12 +327,10 @@ func (p Plan) Validate() error {
 		}
 	}
 
-	// Validate the plan rates.
-	for _, r := range p.Rates {
-		if err := r.ValidateForPlan(); err != nil {
-			return err
-		}
-	}
+	return nil
+}
+
+func (p Plan) ValidatePlanRateUniqueness() error {
 
 	// Verify that there's only one rate per effective date.
 	uniquePlanRates := make(map[int64]bool)
@@ -564,6 +574,46 @@ func (a *Addon) ToQMSType() *qms.Addon {
 	}
 }
 
+func (a *Addon) Validate() error {
+
+	// The name and description are both required.
+	if a.Name == "" {
+		return fmt.Errorf("name must be set")
+	}
+	if a.Description == "" {
+		return fmt.Errorf("description must be set")
+	}
+
+	// The default amount must be positive.
+	if a.DefaultAmount <= 0.0 {
+		return fmt.Errorf("default_amount must be greater than 0.0")
+	}
+
+	// Verify that we have enough information to attempt to look up the resource type.
+	if err := a.ResourceType.ValidateForPlan(); err != nil {
+		return err
+	}
+
+	// Validate the incoming addon rates.
+	return nil
+}
+
+func (a *Addon) ValidateAddonRateUniqueness() error {
+
+	// Verify that there's only one rate per effective date.
+	uniqueAddonRates := make(map[int64]bool)
+	for _, r := range a.AddonRates {
+		key := r.EffectiveDate.UnixMicro()
+		if uniqueAddonRates[key] {
+			return fmt.Errorf("there can only be one plan rate for each effective date")
+		} else {
+			uniqueAddonRates[key] = true
+		}
+	}
+
+	return nil
+}
+
 type AddonRate struct {
 	ID            string    `db:"id" goqu:"defaultifempty,skipupdate"`
 	AddonID       string    `db:"addon_id"`
@@ -590,6 +640,21 @@ func (r *AddonRate) ToQMSType() *qms.AddonRate {
 		EffectiveDate: timestamppb.New(r.EffectiveDate),
 		Rate:          r.Rate,
 	}
+}
+
+func (r *AddonRate) Validate() error {
+
+	// The rate can't be negative.
+	if r.Rate < 0 {
+		return fmt.Errorf("the plan rate must not be less than zero")
+	}
+
+	// The effective date has to be specified.
+	if r.EffectiveDate.IsZero() {
+		return fmt.Errorf("the effective date of the plan rate must be specified")
+	}
+
+	return nil
 }
 
 type UpdateAddon struct {

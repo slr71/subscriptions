@@ -17,72 +17,55 @@ import (
 )
 
 func (a *App) addAddon(ctx context.Context, request *qms.AddAddonRequest) *qms.AddonResponse {
+	var newAddon *db.Addon
 	d := db.New(a.db)
-
-	reqAddon := request.Addon
 	response := qmsinit.NewAddonResponse()
 
-	if reqAddon.Name == "" {
-		response.Error = serrors.NatsError(ctx, errors.New("name must be set"))
-		return response
+	// Validate the incoming request.
+	requestedAddon := db.NewAddonFromQMS(request.Addon)
+	if err := requestedAddon.Validate(); err != nil {
+		response.Error = serrors.NatsError(ctx, err)
+	}
+	if err := requestedAddon.ValidateAddonRateUniqueness(); err != nil {
+		response.Error = serrors.NatsError(ctx, err)
 	}
 
-	if reqAddon.Description == "" {
-		response.Error = serrors.NatsError(ctx, errors.New("descriptions must be set"))
-		return response
-	}
-
-	if reqAddon.DefaultAmount <= 0.0 {
-		response.Error = serrors.NatsError(ctx, errors.New("default_amount must be greater than 0.0"))
-		return response
-	}
-
-	if reqAddon.ResourceType.Name == "" && reqAddon.ResourceType.Uuid == "" {
-		response.Error = serrors.NatsError(ctx, errors.New("resource_type.name or resource_type.uuid must be set"))
-		return response
-	}
-
-	var lookupRT *db.ResourceType
-
+	// Start a transaction.
 	tx, err := d.Begin()
 	if err != nil {
 		response.Error = serrors.NatsError(ctx, err)
 		return response
 	}
-	defer func() {
-		_ = tx.Rollback()
-	}()
+	err = tx.Wrap(func() error {
 
-	if reqAddon.ResourceType.Name != "" && reqAddon.ResourceType.Uuid == "" {
-		lookupRT, err = d.GetResourceTypeByName(ctx, reqAddon.ResourceType.Name, db.WithTX(tx))
+		// Look up the resource type.
+		resourceType, err := d.LookupResoureType(ctx, &requestedAddon.ResourceType, db.WithTX(tx))
 		if err != nil {
-			response.Error = serrors.NatsError(ctx, err)
-			return response
+			return err
 		}
-	} else {
-		lookupRT, err = d.GetResourceType(ctx, reqAddon.ResourceType.Uuid, db.WithTX(tx))
+		requestedAddon.ResourceType = *resourceType
+
+		// Add the addon to the database.
+		addonID, err := d.AddAddon(ctx, requestedAddon, db.WithTX(tx))
 		if err != nil {
-			response.Error = serrors.NatsError(ctx, err)
-			return response
+			return err
 		}
-	}
 
-	newAddon := db.NewAddonFromQMS(request.Addon)
-	newAddon.ResourceType = *lookupRT
+		// Retrieve the addon from the database.
+		newAddon, err = d.GetAddonByID(ctx, addonID, db.WithTX(tx))
+		if err != nil {
+			return err
+		}
 
-	newID, err := d.AddAddon(ctx, newAddon, db.WithTX(tx))
+		return nil
+	})
 	if err != nil {
 		response.Error = serrors.NatsError(ctx, err)
 		return response
 	}
 
-	if err = tx.Commit(); err != nil {
-		response.Error = serrors.NatsError(ctx, err)
-		return response
-	}
-
+	// Return the inserted addon.
 	response.Addon = newAddon.ToQMSType()
-	response.Addon.Uuid = newID
 	return response
 }
 
