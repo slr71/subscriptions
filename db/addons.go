@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 
 	t "github.com/cyverse-de/subscriptions/db/tables"
 	suberrors "github.com/cyverse-de/subscriptions/errors"
@@ -75,9 +76,18 @@ func (d *Database) GetAddonByID(ctx context.Context, addonID string, opts ...Que
 		Where(t.Addons.Col("id").Eq(addonID)).
 		Executor()
 
-	if addonFound, err = addonInfo.ScanStructContext(ctx, addon); err != nil || !addonFound {
+	addonFound, err = addonInfo.ScanStructContext(ctx, addon)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to get add-on info")
+	} else if !addonFound {
+		return nil, fmt.Errorf("addon ID %s not found", addonID)
+	}
+
+	addonRates, err := d.ListRatesForAddon(ctx, addonID, opts...)
+	if err != nil {
 		return nil, errors.Wrap(err, "unable to get add-on info")
 	}
+	addon.AddonRates = addonRates
 
 	return addon, nil
 }
@@ -126,7 +136,9 @@ func (d *Database) ListRatesForAddon(ctx context.Context, addonID string, opts .
 			t.AddonRates.Col("addon_id"),
 			t.AddonRates.Col("effective_date"),
 			t.AddonRates.Col("rate"),
-		)
+		).
+		Where(goqu.Ex{"addon_id": addonID}).
+		Order(goqu.I("effective_date").Asc())
 	d.LogSQL(ds)
 
 	var addonRates []AddonRate
@@ -191,6 +203,45 @@ func (d *Database) ToggleAddonPaid(ctx context.Context, addonID string, opts ...
 	return retval, nil
 }
 
+func (d *Database) AddAddonRate(ctx context.Context, r AddonRate, opts ...QueryOption) error {
+	_, db := d.querySettings(opts...)
+
+	ds := db.Insert(t.AddonRates).
+		Rows(
+			goqu.Record{
+				"addon_id":       r.AddonID,
+				"effective_date": r.EffectiveDate,
+				"rate":           r.Rate,
+			},
+		).
+		Executor()
+	if _, err := ds.ExecContext(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (d *Database) UpdateAddonRate(ctx context.Context, r AddonRate, opts ...QueryOption) error {
+	_, db := d.querySettings(opts...)
+
+	ds := db.Update(t.AddonRates).
+		Set(
+			goqu.Record{
+				"addon_id":       r.AddonID,
+				"effective_date": r.EffectiveDate,
+				"rate":           r.Rate,
+			},
+		).
+		Where(t.AddonRates.Col("id").Eq(r.ID)).
+		Executor()
+	if _, err := ds.ExecContext(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (d *Database) UpdateAddon(ctx context.Context, updatedAddon *UpdateAddon, opts ...QueryOption) (*Addon, error) {
 	_, db := d.querySettings(opts...)
 
@@ -230,9 +281,25 @@ func (d *Database) UpdateAddon(ctx context.Context, updatedAddon *UpdateAddon, o
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to scan results of update")
 	}
-
 	if !found {
 		return nil, suberrors.ErrAddonNotFound
+	}
+
+	// Update existing addon rates.
+	if updatedAddon.UpdateAddonRates {
+		for _, r := range updatedAddon.AddonRates {
+			if r.ID == "" {
+				err = d.AddAddonRate(ctx, r, opts...)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				err = d.UpdateAddonRate(ctx, r, opts...)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
 	}
 
 	return retval, nil

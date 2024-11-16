@@ -174,14 +174,28 @@ func (a *App) updateAddon(ctx context.Context, request *qms.UpdateAddonRequest) 
 
 	updateAddon := db.NewUpdateAddonFromQMS(request)
 
-	result, err := d.UpdateAddon(ctx, updateAddon)
+	tx, err := d.Begin()
 	if err != nil {
 		response.Error = serrors.NatsError(ctx, err)
 		return response
 	}
+	err = tx.Wrap(func() error {
+		_, err := d.UpdateAddon(ctx, updateAddon, db.WithTX(tx))
+		if err != nil {
+			return err
+		}
 
-	response.Addon = result.ToQMSType()
+		result, err := d.GetAddonByID(ctx, updateAddon.ID, db.WithTX(tx))
+		if err != nil {
+			return err
+		}
+		response.Addon = result.ToQMSType()
 
+		return nil
+	})
+	if err != nil {
+		response.Error = serrors.NatsError(ctx, err)
+	}
 	return response
 }
 

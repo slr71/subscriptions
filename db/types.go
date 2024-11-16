@@ -658,17 +658,19 @@ func (r *AddonRate) Validate() error {
 }
 
 type UpdateAddon struct {
-	ID                  string  `db:"id" goqu:"skipupdate"`
-	Name                string  `db:"name"`
-	UpdateName          bool    `db:"-"`
-	Description         string  `db:"description"`
-	UpdateDescription   bool    `db:"-"`
-	ResourceTypeID      string  `db:"resource_type_id"`
-	UpdateResourceType  bool    `db:"-"`
-	DefaultAmount       float64 `db:"default_amount"`
-	UpdateDefaultAmount bool    `db:"-"`
-	DefaultPaid         bool    `db:"default_paid"`
-	UpdateDefaultPaid   bool    `db:"-"`
+	ID                  string      `db:"id" goqu:"skipupdate"`
+	Name                string      `db:"name"`
+	UpdateName          bool        `db:"-"`
+	Description         string      `db:"description"`
+	UpdateDescription   bool        `db:"-"`
+	ResourceTypeID      string      `db:"resource_type_id"`
+	UpdateResourceType  bool        `db:"-"`
+	DefaultAmount       float64     `db:"default_amount"`
+	UpdateDefaultAmount bool        `db:"-"`
+	DefaultPaid         bool        `db:"default_paid"`
+	UpdateDefaultPaid   bool        `db:"-"`
+	AddonRates          []AddonRate `db:"-"`
+	UpdateAddonRates    bool        `db:"-"`
 }
 
 func NewUpdateAddonFromQMS(u *qms.UpdateAddonRequest) *UpdateAddon {
@@ -679,6 +681,7 @@ func NewUpdateAddonFromQMS(u *qms.UpdateAddonRequest) *UpdateAddon {
 		UpdateResourceType:  u.UpdateResourceType,
 		UpdateDefaultAmount: u.UpdateDefaultAmount,
 		UpdateDefaultPaid:   u.UpdateDefaultPaid,
+		UpdateAddonRates:    u.UpdateAddonRates,
 	}
 
 	if update.UpdateName {
@@ -695,6 +698,13 @@ func NewUpdateAddonFromQMS(u *qms.UpdateAddonRequest) *UpdateAddon {
 	}
 	if update.UpdateResourceType {
 		update.ResourceTypeID = u.Addon.ResourceType.Uuid
+	}
+	if update.UpdateAddonRates {
+		addonRates := make([]AddonRate, len(u.Addon.AddonRates))
+		for i, r := range u.Addon.AddonRates {
+			addonRates[i] = *NewAddonRateFromQMS(r, u.Addon.Uuid)
+		}
+		update.AddonRates = addonRates
 	}
 	return update
 }
