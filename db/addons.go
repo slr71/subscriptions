@@ -242,59 +242,73 @@ func (d *Database) UpdateAddonRate(ctx context.Context, r AddonRate, opts ...Que
 	return nil
 }
 
-func (d *Database) UpdateAddon(ctx context.Context, updatedAddon *UpdateAddon, opts ...QueryOption) (*Addon, error) {
+func (d *Database) UpdateAddon(
+	ctx context.Context,
+	addonUpdateRecord *UpdateAddon,
+	opts ...QueryOption,
+) (*Addon, error) {
+	var retval *Addon
 	_, db := d.querySettings(opts...)
 
 	rec := goqu.Record{}
 
-	if updatedAddon.UpdateName {
-		rec["name"] = updatedAddon.Name
+	updateAddon := false
+	if addonUpdateRecord.UpdateName {
+		rec["name"] = addonUpdateRecord.Name
+		updateAddon = true
 	}
-	if updatedAddon.UpdateDescription {
-		rec["description"] = updatedAddon.Description
+	if addonUpdateRecord.UpdateDescription {
+		rec["description"] = addonUpdateRecord.Description
+		updateAddon = true
 	}
-	if updatedAddon.UpdateResourceType {
-		rec["resource_type_id"] = updatedAddon.ResourceTypeID
+	if addonUpdateRecord.UpdateResourceType {
+		rec["resource_type_id"] = addonUpdateRecord.ResourceTypeID
+		updateAddon = true
 	}
-	if updatedAddon.UpdateDefaultAmount {
-		rec["default_amount"] = updatedAddon.DefaultAmount
+	if addonUpdateRecord.UpdateDefaultAmount {
+		rec["default_amount"] = addonUpdateRecord.DefaultAmount
+		updateAddon = true
 	}
-	if updatedAddon.UpdateDefaultPaid {
-		rec["default_paid"] = updatedAddon.DefaultPaid
+	if addonUpdateRecord.UpdateDefaultPaid {
+		rec["default_paid"] = addonUpdateRecord.DefaultPaid
+		updateAddon = true
 	}
 
-	ds := db.Update(t.Addons).
-		Set(rec).
-		Where(t.Addons.Col("id").Eq(updatedAddon.ID)).
-		Returning(
-			t.Addons.Col("id"),
-			t.Addons.Col("name"),
-			t.Addons.Col("description"),
-			t.Addons.Col("default_amount"),
-			t.Addons.Col("default_paid"),
-			t.Addons.Col("resource_type_id").As(goqu.C("resource_types.id")),
-		).
-		Executor()
+	// Update the top-level addon record if requested.
+	if updateAddon {
+		ds := db.Update(t.Addons).
+			Set(rec).
+			Where(t.Addons.Col("id").Eq(addonUpdateRecord.ID)).
+			Returning(
+				t.Addons.Col("id"),
+				t.Addons.Col("name"),
+				t.Addons.Col("description"),
+				t.Addons.Col("default_amount"),
+				t.Addons.Col("default_paid"),
+				t.Addons.Col("resource_type_id").As(goqu.C("resource_types.id")),
+			).
+			Executor()
 
-	retval := &Addon{}
-	found, err := ds.ScanStructContext(ctx, retval)
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to scan results of update")
-	}
-	if !found {
-		return nil, suberrors.ErrAddonNotFound
+		retval := &Addon{}
+		found, err := ds.ScanStructContext(ctx, retval)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan results of update")
+		}
+		if !found {
+			return nil, suberrors.ErrAddonNotFound
+		}
 	}
 
 	// Update existing addon rates.
-	if updatedAddon.UpdateAddonRates {
-		for _, r := range updatedAddon.AddonRates {
+	if addonUpdateRecord.UpdateAddonRates {
+		for _, r := range addonUpdateRecord.AddonRates {
 			if r.ID == "" {
-				err = d.AddAddonRate(ctx, r, opts...)
+				err := d.AddAddonRate(ctx, r, opts...)
 				if err != nil {
 					return nil, err
 				}
 			} else {
-				err = d.UpdateAddonRate(ctx, r, opts...)
+				err := d.UpdateAddonRate(ctx, r, opts...)
 				if err != nil {
 					return nil, err
 				}
