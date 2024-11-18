@@ -424,6 +424,10 @@ func (d *Database) AddSubscriptionAddon(ctx context.Context, subscriptionID, add
 	if err != nil {
 		return nil, err
 	}
+	addonRate := addon.GetCurrentRate()
+	if addonRate == nil {
+		return nil, fmt.Errorf("no active rate found for addon %s", addon.ID)
+	}
 
 	ds := db.Insert(t.SubscriptionAddons).
 		Rows(goqu.Record{
@@ -431,6 +435,7 @@ func (d *Database) AddSubscriptionAddon(ctx context.Context, subscriptionID, add
 			"addon_id":        addonID,
 			"amount":          addon.DefaultAmount,
 			"paid":            addon.DefaultPaid,
+			"addon_rate_id":   addonRate.ID,
 		}).
 		Returning(t.SubscriptionAddons.Col("id")).
 		Executor()
@@ -457,6 +462,7 @@ func (d *Database) AddSubscriptionAddon(ctx context.Context, subscriptionID, add
 		Subscription: *subscription,
 		Amount:       addon.DefaultAmount,
 		Paid:         addon.DefaultPaid,
+		Rate:         *addonRate,
 	}
 
 	return retval, nil

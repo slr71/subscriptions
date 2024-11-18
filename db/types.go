@@ -614,6 +614,19 @@ func (a *Addon) ValidateAddonRateUniqueness() error {
 	return nil
 }
 
+// GetCurrentRate determines the rate that is currently active.
+func (a *Addon) GetCurrentRate() *AddonRate {
+	var currentRate *AddonRate
+	now := time.Now()
+	for _, r := range a.AddonRates {
+		if r.EffectiveDate.After(now) {
+			break
+		}
+		currentRate = &r
+	}
+	return currentRate
+}
+
 type AddonRate struct {
 	ID            string    `db:"id" goqu:"defaultifempty,skipupdate"`
 	AddonID       string    `db:"addon_id"`
@@ -715,6 +728,7 @@ type SubscriptionAddon struct {
 	Subscription Subscription `db:"subscriptions"`
 	Amount       float64      `db:"amount"`
 	Paid         bool         `db:"paid"`
+	Rate         AddonRate    `db:"addon_rates"`
 }
 
 func NewSubscriptionAddonFromQMS(sa *qms.SubscriptionAddon) *SubscriptionAddon {
@@ -724,6 +738,7 @@ func NewSubscriptionAddonFromQMS(sa *qms.SubscriptionAddon) *SubscriptionAddon {
 		Subscription: *NewSubscriptionFromQMS(sa.Subscription),
 		Amount:       float64(sa.Amount),
 		Paid:         sa.Paid,
+		Rate:         *NewAddonRateFromQMS(sa.AddonRate, sa.Uuid),
 	}
 }
 
@@ -734,6 +749,7 @@ func (sa *SubscriptionAddon) ToQMSType() *qms.SubscriptionAddon {
 		Subscription: sa.Subscription.ToQMSSubscription(),
 		Amount:       sa.Amount,
 		Paid:         sa.Paid,
+		AddonRate:    sa.Rate.ToQMSType(),
 	}
 }
 
