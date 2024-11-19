@@ -311,16 +311,24 @@ func (a *App) listSubscriptionAddons(ctx context.Context, request *requests.ByUU
 	response := qmsinit.NewSubscriptionAddonListResponse()
 
 	d := db.New(a.db)
-
-	results, err := d.ListSubscriptionAddons(ctx, request.Uuid)
+	tx, err := d.Begin()
 	if err != nil {
 		response.Error = serrors.NatsError(ctx, err)
 		return response
 	}
 
-	for _, addon := range results {
-		response.SubscriptionAddons = append(response.SubscriptionAddons, addon.ToQMSType())
-	}
+	err = tx.Wrap(func() error {
+		results, err := d.ListSubscriptionAddons(ctx, request.Uuid, db.WithTX(tx))
+		if err != nil {
+			return err
+		}
+
+		for _, addon := range results {
+			response.SubscriptionAddons = append(response.SubscriptionAddons, addon.ToQMSType())
+		}
+
+		return nil
+	})
 
 	return response
 }

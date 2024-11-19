@@ -353,6 +353,9 @@ func subAddonDS(db GoquDatabase) *goqu.SelectDataset {
 			t.Subscriptions.Col("last_modified_by").As(goqu.C("subscriptions.last_modified_by")),
 			t.Subscriptions.Col("last_modified_at").As(goqu.C("subscriptions.last_modified_at")),
 			t.Subscriptions.Col("paid").As(goqu.C("subscriptions.paid")),
+			t.PlanRates.Col("id").As(goqu.C("subscriptions.plan_rates.id")),
+			t.PlanRates.Col("effective_date").As(goqu.C("subscriptions.plan_rates.effective_date")),
+			t.PlanRates.Col("rate").As(goqu.C("subscriptions.plan_rates.rate")),
 			t.Users.Col("id").As(goqu.C("subscriptions.users.id")),
 			t.Users.Col("username").As(goqu.C("subscriptions.users.username")),
 			t.Plans.Col("id").As(goqu.C("subscriptions.plans.id")),
@@ -361,12 +364,18 @@ func subAddonDS(db GoquDatabase) *goqu.SelectDataset {
 
 			t.SubscriptionAddons.Col("amount"),
 			t.SubscriptionAddons.Col("paid"),
+
+			t.AddonRates.Col("id").As(goqu.C("addon_rates.id")),
+			t.AddonRates.Col("effective_date").As(goqu.C("addon_rates.effective_date")),
+			t.AddonRates.Col("rate").As(goqu.C("addon_rates.rate")),
 		).
 		Join(t.Subscriptions, goqu.On(t.SubscriptionAddons.Col("subscription_id").Eq(t.Subscriptions.Col("id")))).
+		Join(t.PlanRates, goqu.On(t.Subscriptions.Col("plan_rate_id").Eq(t.PlanRates.Col("id")))).
 		Join(t.Addons, goqu.On(t.Addons.Col("id").Eq(t.SubscriptionAddons.Col("addon_id")))).
 		Join(t.ResourceTypes, goqu.On(t.Addons.Col("resource_type_id").Eq(t.ResourceTypes.Col("id")))).
 		Join(t.Users, goqu.On(t.Subscriptions.Col("user_id").Eq(t.Users.Col("id")))).
-		Join(t.Plans, goqu.On(t.Subscriptions.Col("plan_id").Eq(t.Plans.Col("id"))))
+		Join(t.Plans, goqu.On(t.Subscriptions.Col("plan_id").Eq(t.Plans.Col("id")))).
+		Join(t.AddonRates, goqu.On(t.SubscriptionAddons.Col("addon_rate_id").Eq(t.AddonRates.Col("id"))))
 }
 
 func (d *Database) GetSubscriptionAddonByID(ctx context.Context, subAddonID string, opts ...QueryOption) (*SubscriptionAddon, error) {
@@ -390,7 +399,11 @@ func (d *Database) GetSubscriptionAddonByID(ctx context.Context, subAddonID stri
 	return subAddon, nil
 }
 
-func (d *Database) ListSubscriptionAddons(ctx context.Context, subscriptionID string, opts ...QueryOption) ([]SubscriptionAddon, error) {
+func (d *Database) ListSubscriptionAddons(
+	ctx context.Context,
+	subscriptionID string,
+	opts ...QueryOption,
+) ([]SubscriptionAddon, error) {
 	_, db := d.querySettings(opts...)
 
 	ds := subAddonDS(db).
@@ -406,7 +419,11 @@ func (d *Database) ListSubscriptionAddons(ctx context.Context, subscriptionID st
 	return addons, nil
 }
 
-func (d *Database) AddSubscriptionAddon(ctx context.Context, subscriptionID, addonID string, opts ...QueryOption) (*SubscriptionAddon, error) {
+func (d *Database) AddSubscriptionAddon(
+	ctx context.Context,
+	subscriptionID, addonID string,
+	opts ...QueryOption,
+) (*SubscriptionAddon, error) {
 	qs, db, err := d.querySettingsWithTX(opts...)
 	if err != nil {
 		return nil, err
