@@ -1,6 +1,6 @@
 module github.com/cyverse-de/subscriptions
 
-go 1.23.2
+go 1.23.3
 
 replace github.com/cyverse-de/p/go/qms => /Users/sarahr/src/de/libs/p/go/qms
 
