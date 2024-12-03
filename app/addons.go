@@ -329,6 +329,9 @@ func (a *App) listSubscriptionAddons(ctx context.Context, request *requests.ByUU
 
 		return nil
 	})
+	if err != nil {
+		response.Error = serrors.NatsError(ctx, err)
+	}
 
 	return response
 }

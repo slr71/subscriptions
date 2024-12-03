@@ -82,6 +82,7 @@ func (s *ConnectionSettings) toConnectOptions() []nats.Option {
 	return options
 }
 
+//nolint:staticcheck
 func NewConnection(settings *ConnectionSettings) (*nats.EncodedConn, error) {
 	log := log.WithFields(logrus.Fields{"context": "new nats conn"})
 
@@ -100,12 +101,14 @@ func NewConnection(settings *ConnectionSettings) (*nats.EncodedConn, error) {
 	return encConn, nil
 }
 
+//nolint:staticcheck
 type Client struct {
 	conn          *nats.EncodedConn
 	subscriptions []*nats.Subscription
 	queueSuffix   string
 }
 
+//nolint:staticcheck
 func NewClient(conn *nats.EncodedConn, queueSuffix string) *Client {
 	return &Client{
 		conn:          conn,
@@ -118,6 +121,7 @@ func (c *Client) queueName(base string) string {
 	return strings.Join([]string{base, c.queueSuffix}, ".")
 }
 
+//nolint:staticcheck
 func (c *Client) Subscribe(subject string, handler nats.Handler) error {
 	queue := c.queueName(subject)
 
