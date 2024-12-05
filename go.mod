@@ -2,21 +2,15 @@ module github.com/cyverse-de/subscriptions
 
 go 1.23.3
 
-replace github.com/cyverse-de/p/go/qms => /Users/sarahr/src/de/libs/p/go/qms
-
-replace github.com/cyverse-de/p/go/requests => /Users/sarahr/src/de/libs/p/go/requests
-
-replace github.com/cyverse-de/p/go/svcerror => /Users/sarahr/src/de/libs/p/go/svcerror
-
 require (
 	github.com/cyverse-de/go-mod/cfg v0.0.2
-	github.com/cyverse-de/go-mod/gotelnats v0.0.12
+	github.com/cyverse-de/go-mod/gotelnats v0.0.15
 	github.com/cyverse-de/go-mod/logging v0.0.3
-	github.com/cyverse-de/go-mod/otelutils v0.0.4
-	github.com/cyverse-de/go-mod/pbinit v0.1.12
-	github.com/cyverse-de/go-mod/protobufjson v0.0.4
+	github.com/cyverse-de/go-mod/otelutils v0.0.5
+	github.com/cyverse-de/go-mod/pbinit v0.1.13
+	github.com/cyverse-de/go-mod/protobufjson v0.0.7
 	github.com/cyverse-de/go-mod/subjects v0.1.5
-	github.com/cyverse-de/p/go/qms v0.1.13
+	github.com/cyverse-de/p/go/qms v0.1.15
 	github.com/cyverse-de/p/go/requests v0.0.3
 	github.com/cyverse-de/p/go/svcerror v0.0.8
 	github.com/doug-martin/goqu/v9 v9.19.0
