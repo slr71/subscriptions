@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 
 	t "github.com/cyverse-de/subscriptions/db/tables"
 	suberrors "github.com/cyverse-de/subscriptions/errors"
@@ -26,6 +27,22 @@ func (d *Database) AddAddon(ctx context.Context, addon *Addon, opts ...QueryOpti
 
 	var newAddonID string
 	if _, err := ds.ScanValContext(ctx, &newAddonID); err != nil {
+		return "", err
+	}
+
+	// Add the addon rates.
+	addonRateRows := make([]interface{}, len(addon.AddonRates))
+	for i, r := range addon.AddonRates {
+		addonRateRows[i] = goqu.Record{
+			"addon_id":       newAddonID,
+			"effective_date": r.EffectiveDate,
+			"rate":           r.Rate,
+		}
+	}
+	addonRateDS := db.Insert(t.AddonRates).
+		Rows(addonRateRows...).
+		Executor()
+	if _, err := addonRateDS.ExecContext(ctx); err != nil {
 		return "", err
 	}
 
@@ -59,14 +76,24 @@ func (d *Database) GetAddonByID(ctx context.Context, addonID string, opts ...Que
 		Where(t.Addons.Col("id").Eq(addonID)).
 		Executor()
 
-	if addonFound, err = addonInfo.ScanStructContext(ctx, addon); err != nil || !addonFound {
+	addonFound, err = addonInfo.ScanStructContext(ctx, addon)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to get add-on info")
+	} else if !addonFound {
+		return nil, fmt.Errorf("addon ID %s not found", addonID)
+	}
+
+	addonRates, err := d.ListRatesForAddon(ctx, addonID, opts...)
+	if err != nil {
 		return nil, errors.Wrap(err, "unable to get add-on info")
 	}
+	addon.AddonRates = addonRates
 
 	return addon, nil
 }
 
 func (d *Database) ListAddons(ctx context.Context, opts ...QueryOption) ([]Addon, error) {
+	wrapMsg := "unable to list addons"
 	_, db := d.querySettings(opts...)
 
 	ds := db.From(t.Addons).
@@ -86,10 +113,40 @@ func (d *Database) ListAddons(ctx context.Context, opts ...QueryOption) ([]Addon
 
 	var addons []Addon
 	if err := ds.ScanStructsContext(ctx, &addons); err != nil {
-		return nil, errors.Wrap(err, "unable to list addons")
+		return nil, errors.Wrap(err, wrapMsg)
+	}
+
+	for i, addon := range addons {
+		addonRates, err := d.ListRatesForAddon(ctx, addon.ID, opts...)
+		if err != nil {
+			return nil, errors.Wrap(err, wrapMsg)
+		}
+		addons[i].AddonRates = addonRates
 	}
 
 	return addons, nil
+}
+
+func (d *Database) ListRatesForAddon(ctx context.Context, addonID string, opts ...QueryOption) ([]AddonRate, error) {
+	_, db := d.querySettings(opts...)
+
+	ds := db.From(t.AddonRates).
+		Select(
+			t.AddonRates.Col("id"),
+			t.AddonRates.Col("addon_id"),
+			t.AddonRates.Col("effective_date"),
+			t.AddonRates.Col("rate"),
+		).
+		Where(goqu.Ex{"addon_id": addonID}).
+		Order(goqu.I("effective_date").Asc())
+	d.LogSQL(ds)
+
+	var addonRates []AddonRate
+	if err := ds.ScanStructsContext(ctx, &addonRates); err != nil {
+		return nil, errors.Wrapf(err, "unable to list rates for addon ID %s", addonID)
+	}
+
+	return addonRates, nil
 }
 
 func (d *Database) ToggleAddonPaid(ctx context.Context, addonID string, opts ...QueryOption) (*Addon, error) {
@@ -146,48 +203,117 @@ func (d *Database) ToggleAddonPaid(ctx context.Context, addonID string, opts ...
 	return retval, nil
 }
 
-func (d *Database) UpdateAddon(ctx context.Context, updatedAddon *UpdateAddon, opts ...QueryOption) (*Addon, error) {
+func (d *Database) AddAddonRate(ctx context.Context, r AddonRate, opts ...QueryOption) error {
+	_, db := d.querySettings(opts...)
+
+	ds := db.Insert(t.AddonRates).
+		Rows(
+			goqu.Record{
+				"addon_id":       r.AddonID,
+				"effective_date": r.EffectiveDate,
+				"rate":           r.Rate,
+			},
+		).
+		Executor()
+	if _, err := ds.ExecContext(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (d *Database) UpdateAddonRate(ctx context.Context, r AddonRate, opts ...QueryOption) error {
+	_, db := d.querySettings(opts...)
+
+	ds := db.Update(t.AddonRates).
+		Set(
+			goqu.Record{
+				"addon_id":       r.AddonID,
+				"effective_date": r.EffectiveDate,
+				"rate":           r.Rate,
+			},
+		).
+		Where(t.AddonRates.Col("id").Eq(r.ID)).
+		Executor()
+	if _, err := ds.ExecContext(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (d *Database) UpdateAddon(
+	ctx context.Context,
+	addonUpdateRecord *UpdateAddon,
+	opts ...QueryOption,
+) (*Addon, error) {
+	var retval *Addon
 	_, db := d.querySettings(opts...)
 
 	rec := goqu.Record{}
 
-	if updatedAddon.UpdateName {
-		rec["name"] = updatedAddon.Name
+	updateAddon := false
+	if addonUpdateRecord.UpdateName {
+		rec["name"] = addonUpdateRecord.Name
+		updateAddon = true
 	}
-	if updatedAddon.UpdateDescription {
-		rec["description"] = updatedAddon.Description
+	if addonUpdateRecord.UpdateDescription {
+		rec["description"] = addonUpdateRecord.Description
+		updateAddon = true
 	}
-	if updatedAddon.UpdateResourceType {
-		rec["resource_type_id"] = updatedAddon.ResourceTypeID
+	if addonUpdateRecord.UpdateResourceType {
+		rec["resource_type_id"] = addonUpdateRecord.ResourceTypeID
+		updateAddon = true
 	}
-	if updatedAddon.UpdateDefaultAmount {
-		rec["default_amount"] = updatedAddon.DefaultAmount
+	if addonUpdateRecord.UpdateDefaultAmount {
+		rec["default_amount"] = addonUpdateRecord.DefaultAmount
+		updateAddon = true
 	}
-	if updatedAddon.UpdateDefaultPaid {
-		rec["default_paid"] = updatedAddon.DefaultPaid
-	}
-
-	ds := db.Update(t.Addons).
-		Set(rec).
-		Where(t.Addons.Col("id").Eq(updatedAddon.ID)).
-		Returning(
-			t.Addons.Col("id"),
-			t.Addons.Col("name"),
-			t.Addons.Col("description"),
-			t.Addons.Col("default_amount"),
-			t.Addons.Col("default_paid"),
-			t.Addons.Col("resource_type_id").As(goqu.C("resource_types.id")),
-		).
-		Executor()
-
-	retval := &Addon{}
-	found, err := ds.ScanStructContext(ctx, retval)
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to scan results of update")
+	if addonUpdateRecord.UpdateDefaultPaid {
+		rec["default_paid"] = addonUpdateRecord.DefaultPaid
+		updateAddon = true
 	}
 
-	if !found {
-		return nil, suberrors.ErrAddonNotFound
+	// Update the top-level addon record if requested.
+	if updateAddon {
+		ds := db.Update(t.Addons).
+			Set(rec).
+			Where(t.Addons.Col("id").Eq(addonUpdateRecord.ID)).
+			Returning(
+				t.Addons.Col("id"),
+				t.Addons.Col("name"),
+				t.Addons.Col("description"),
+				t.Addons.Col("default_amount"),
+				t.Addons.Col("default_paid"),
+				t.Addons.Col("resource_type_id").As(goqu.C("resource_types.id")),
+			).
+			Executor()
+
+		retval := &Addon{}
+		found, err := ds.ScanStructContext(ctx, retval)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan results of update")
+		}
+		if !found {
+			return nil, suberrors.ErrAddonNotFound
+		}
+	}
+
+	// Update existing addon rates.
+	if addonUpdateRecord.UpdateAddonRates {
+		for _, r := range addonUpdateRecord.AddonRates {
+			if r.ID == "" {
+				err := d.AddAddonRate(ctx, r, opts...)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				err := d.UpdateAddonRate(ctx, r, opts...)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
 	}
 
 	return retval, nil
@@ -227,6 +353,9 @@ func subAddonDS(db GoquDatabase) *goqu.SelectDataset {
 			t.Subscriptions.Col("last_modified_by").As(goqu.C("subscriptions.last_modified_by")),
 			t.Subscriptions.Col("last_modified_at").As(goqu.C("subscriptions.last_modified_at")),
 			t.Subscriptions.Col("paid").As(goqu.C("subscriptions.paid")),
+			t.PlanRates.Col("id").As(goqu.C("subscriptions.plan_rates.id")),
+			t.PlanRates.Col("effective_date").As(goqu.C("subscriptions.plan_rates.effective_date")),
+			t.PlanRates.Col("rate").As(goqu.C("subscriptions.plan_rates.rate")),
 			t.Users.Col("id").As(goqu.C("subscriptions.users.id")),
 			t.Users.Col("username").As(goqu.C("subscriptions.users.username")),
 			t.Plans.Col("id").As(goqu.C("subscriptions.plans.id")),
@@ -235,12 +364,18 @@ func subAddonDS(db GoquDatabase) *goqu.SelectDataset {
 
 			t.SubscriptionAddons.Col("amount"),
 			t.SubscriptionAddons.Col("paid"),
+
+			t.AddonRates.Col("id").As(goqu.C("addon_rates.id")),
+			t.AddonRates.Col("effective_date").As(goqu.C("addon_rates.effective_date")),
+			t.AddonRates.Col("rate").As(goqu.C("addon_rates.rate")),
 		).
 		Join(t.Subscriptions, goqu.On(t.SubscriptionAddons.Col("subscription_id").Eq(t.Subscriptions.Col("id")))).
+		Join(t.PlanRates, goqu.On(t.Subscriptions.Col("plan_rate_id").Eq(t.PlanRates.Col("id")))).
 		Join(t.Addons, goqu.On(t.Addons.Col("id").Eq(t.SubscriptionAddons.Col("addon_id")))).
 		Join(t.ResourceTypes, goqu.On(t.Addons.Col("resource_type_id").Eq(t.ResourceTypes.Col("id")))).
 		Join(t.Users, goqu.On(t.Subscriptions.Col("user_id").Eq(t.Users.Col("id")))).
-		Join(t.Plans, goqu.On(t.Subscriptions.Col("plan_id").Eq(t.Plans.Col("id"))))
+		Join(t.Plans, goqu.On(t.Subscriptions.Col("plan_id").Eq(t.Plans.Col("id")))).
+		Join(t.AddonRates, goqu.On(t.SubscriptionAddons.Col("addon_rate_id").Eq(t.AddonRates.Col("id"))))
 }
 
 func (d *Database) GetSubscriptionAddonByID(ctx context.Context, subAddonID string, opts ...QueryOption) (*SubscriptionAddon, error) {
@@ -264,7 +399,11 @@ func (d *Database) GetSubscriptionAddonByID(ctx context.Context, subAddonID stri
 	return subAddon, nil
 }
 
-func (d *Database) ListSubscriptionAddons(ctx context.Context, subscriptionID string, opts ...QueryOption) ([]SubscriptionAddon, error) {
+func (d *Database) ListSubscriptionAddons(
+	ctx context.Context,
+	subscriptionID string,
+	opts ...QueryOption,
+) ([]SubscriptionAddon, error) {
 	_, db := d.querySettings(opts...)
 
 	ds := subAddonDS(db).
@@ -280,7 +419,11 @@ func (d *Database) ListSubscriptionAddons(ctx context.Context, subscriptionID st
 	return addons, nil
 }
 
-func (d *Database) AddSubscriptionAddon(ctx context.Context, subscriptionID, addonID string, opts ...QueryOption) (*SubscriptionAddon, error) {
+func (d *Database) AddSubscriptionAddon(
+	ctx context.Context,
+	subscriptionID, addonID string,
+	opts ...QueryOption,
+) (*SubscriptionAddon, error) {
 	qs, db, err := d.querySettingsWithTX(opts...)
 	if err != nil {
 		return nil, err
@@ -298,6 +441,10 @@ func (d *Database) AddSubscriptionAddon(ctx context.Context, subscriptionID, add
 	if err != nil {
 		return nil, err
 	}
+	addonRate := addon.GetCurrentRate()
+	if addonRate == nil {
+		return nil, fmt.Errorf("no active rate found for addon %s", addon.ID)
+	}
 
 	ds := db.Insert(t.SubscriptionAddons).
 		Rows(goqu.Record{
@@ -305,6 +452,7 @@ func (d *Database) AddSubscriptionAddon(ctx context.Context, subscriptionID, add
 			"addon_id":        addonID,
 			"amount":          addon.DefaultAmount,
 			"paid":            addon.DefaultPaid,
+			"addon_rate_id":   addonRate.ID,
 		}).
 		Returning(t.SubscriptionAddons.Col("id")).
 		Executor()
@@ -331,6 +479,7 @@ func (d *Database) AddSubscriptionAddon(ctx context.Context, subscriptionID, add
 		Subscription: *subscription,
 		Amount:       addon.DefaultAmount,
 		Paid:         addon.DefaultPaid,
+		Rate:         *addonRate,
 	}
 
 	return retval, nil

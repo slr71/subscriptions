@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	t "github.com/cyverse-de/subscriptions/db/tables"
@@ -44,9 +45,14 @@ func subscriptionDS(db GoquDatabase) *goqu.SelectDataset {
 			t.Plans.Col("id").As(goqu.C("plans.id")),
 			t.Plans.Col("name").As(goqu.C("plans.name")),
 			t.Plans.Col("description").As(goqu.C("plans.description")),
+
+			t.PlanRates.Col("id").As(goqu.C("plan_rates.id")),
+			t.PlanRates.Col("effective_date").As(goqu.C("plan_rates.effective_date")),
+			t.PlanRates.Col("rate").As(goqu.C("plan_rates.rate")),
 		).
 		Join(t.Users, goqu.On(t.Subscriptions.Col("user_id").Eq(t.Users.Col("id")))).
-		Join(t.Plans, goqu.On(t.Subscriptions.Col("plan_id").Eq(t.Plans.Col("id"))))
+		Join(t.Plans, goqu.On(t.Subscriptions.Col("plan_id").Eq(t.Plans.Col("id")))).
+		Join(t.PlanRates, goqu.On(t.Subscriptions.Col("plan_rate_id").Eq(t.PlanRates.Col("id"))))
 }
 
 func (d *Database) GetSubscriptionByID(ctx context.Context, subscriptionID string, opts ...QueryOption) (*Subscription, error) {
@@ -115,6 +121,12 @@ func (d *Database) SetActiveSubscription(
 	n := time.Now()
 	e := subscriptionOpts.EndDate
 
+	// Get the active plan rate.
+	activePlanRate := plan.GetActiveRate()
+	if activePlanRate == nil {
+		return "", fmt.Errorf("the %s subscription plan has no effective rate", plan.Name)
+	}
+
 	query := db.Insert(t.Subscriptions).
 		Rows(
 			goqu.Record{
@@ -125,6 +137,7 @@ func (d *Database) SetActiveSubscription(
 				"created_by":           "de",
 				"last_modified_by":     "de",
 				"paid":                 subscriptionOpts.Paid,
+				"plan_rate_id":         activePlanRate.ID,
 			},
 		).
 		Returning(t.Subscriptions.Col("id"))
@@ -136,7 +149,7 @@ func (d *Database) SetActiveSubscription(
 	}
 
 	// Add the quota defaults as the t.Quotas for the user plan.
-	for _, quotaDefault := range plan.QuotaDefaults {
+	for _, quotaDefault := range plan.GetActiveQuotaDefaults() {
 		quotaValue := quotaDefault.QuotaValue * float64(subscriptionOpts.Periods)
 		if quotaDefault.ResourceType.Consumable {
 			quotaValue *= float64(subscriptionOpts.Periods)
@@ -262,6 +275,33 @@ func (d *Database) SubscriptionUsages(ctx context.Context, subscriptionID string
 	return usages, nil
 }
 
+// SubscriptionPlanRates returns a list of rates assocaited with a user plan specified by the passed in UUID. Accepts a
+// variable number of QueryOptions, though only WithTX is currently supported.
+func (d *Database) SubscriptionPlanRates(ctx context.Context, planID string, opts ...QueryOption) ([]PlanRate, error) {
+	var (
+		err   error
+		db    GoquDatabase
+		rates []PlanRate
+	)
+
+	_, db = d.querySettings(opts...)
+
+	ratesQuery := db.From(t.PlanRates).
+		Select(
+			t.PlanRates.Col("id").As("id"),
+			t.PlanRates.Col("plan_id").As("plan_id"),
+			t.PlanRates.Col("effective_date").As("effective_date"),
+			t.PlanRates.Col("rate").As("rate"),
+		).
+		Where(t.PlanRates.Col("plan_id").Eq(planID))
+	d.LogSQL(ratesQuery)
+
+	if err = ratesQuery.Executor().ScanStructsContext(ctx, &rates); err != nil {
+		return nil, err
+	}
+	return rates, nil
+}
+
 // SubscriptionQuotas returns a list of t.Quotas associated with the user plan specified
 // by the UUID passed in. Accepts a variable number of QueryOptions, though only
 // WithTX is currently supported.
@@ -315,6 +355,7 @@ func (d *Database) SubscriptionQuotaDefaults(ctx context.Context, planID string,
 			t.PQD.Col("id").As("id"),
 			t.PQD.Col("quota_value").As("quota_value"),
 			t.PQD.Col("plan_id").As("plan_id"),
+			t.PQD.Col("effective_date").As("effective_date"),
 			t.RT.Col("id").As(goqu.C("resource_types.id")),
 			t.RT.Col("name").As(goqu.C("resource_types.name")),
 			t.RT.Col("unit").As(goqu.C("resource_types.unit")),
@@ -341,28 +382,28 @@ func (d *Database) LoadSubscriptionDetails(ctx context.Context, subscription *Su
 		quotas   []Quota
 	)
 
-	log.Debug("before getting user plan quota defaults")
 	defaults, err = d.SubscriptionQuotaDefaults(ctx, subscription.Plan.ID, opts...)
 	if err != nil {
 		return err
 	}
-	log.Debug("after getting user plan quota defaults")
 
-	log.Debug("before getting user plan t.Quotas")
 	quotas, err = d.SubscriptionQuotas(ctx, subscription.ID, opts...)
 	if err != nil {
 		return err
 	}
-	log.Debug("after getting user plan t.Quotas")
 
-	log.Debug("before getting user plan usages")
 	usages, err = d.SubscriptionUsages(ctx, subscription.ID, opts...)
 	if err != nil {
 		return err
 	}
-	log.Debug("after getting user plan usages")
+
+	planRates, err := d.SubscriptionPlanRates(ctx, subscription.Plan.ID)
+	if err != nil {
+		return err
+	}
 
 	subscription.Plan.QuotaDefaults = defaults
+	subscription.Plan.Rates = planRates
 	subscription.Quotas = quotas
 	subscription.Usages = usages
 

@@ -9,19 +9,32 @@ import (
 	"github.com/pkg/errors"
 )
 
-func planDetailsDS(db GoquDatabase, planID string) *goqu.SelectDataset {
+func planQuotaDefaultsDS(db GoquDatabase, planID string) *goqu.SelectDataset {
 	return db.From(t.PQD).
 		Select(
 			t.PQD.Col("id"),
 			t.PQD.Col("plan_id"),
 			t.PQD.Col("quota_value"),
+			t.PQD.Col("effective_date"),
 
 			t.RT.Col("id").As(goqu.C("resource_types.id")),
 			t.RT.Col("name").As(goqu.C("resource_types.name")),
 			t.RT.Col("unit").As(goqu.C("resource_types.unit")),
 		).
 		Join(t.RT, goqu.On(t.PQD.Col("resource_type_id").Eq(t.RT.Col("id")))).
-		Where(t.PQD.Col("plan_id").Eq(planID))
+		Where(t.PQD.Col("plan_id").Eq(planID)).
+		Order(t.PQD.Col("effective_date").Asc(), t.RT.Col("name").Asc())
+}
+
+func planRatesDS(db GoquDatabase, planID string) *goqu.SelectDataset {
+	return db.From(t.PlanRates).
+		Select(
+			t.PlanRates.Col("id"),
+			t.PlanRates.Col("effective_date"),
+			t.PlanRates.Col("rate"),
+		).
+		Where(t.PlanRates.Col("plan_id").Eq(planID)).
+		Order(t.PlanRates.Col("effective_date").Asc())
 }
 
 func (d *Database) getPlanList(ctx context.Context, opts ...QueryOption) ([]Plan, error) {
@@ -41,12 +54,12 @@ func (d *Database) getPlanList(ctx context.Context, opts ...QueryOption) ([]Plan
 	return plans, nil
 }
 
-func (d *Database) loadPlanDetails(ctx context.Context, plan *Plan, opts ...QueryOption) error {
-	wrapMsg := fmt.Sprintf("unable to load details for plan ID %s", plan.ID)
+func (d *Database) loadPlanQuotaDefaults(ctx context.Context, plan *Plan, opts ...QueryOption) error {
+	wrapMsg := fmt.Sprintf("unable to load the plan quota defaults for plan ID %s", plan.ID)
 	_, db := d.querySettings(opts...)
 
 	// Build the query.
-	query := planDetailsDS(db, plan.ID)
+	query := planQuotaDefaultsDS(db, plan.ID)
 	d.LogSQL(query)
 
 	// Execute the query and scan the results.
@@ -54,6 +67,37 @@ func (d *Database) loadPlanDetails(ctx context.Context, plan *Plan, opts ...Quer
 	if err != nil {
 		return errors.Wrap(err, wrapMsg)
 	}
+	return nil
+}
+
+func (d *Database) loadPlanRates(ctx context.Context, plan *Plan, opts ...QueryOption) error {
+	wrapMsg := fmt.Sprintf("unable to load the plan rates for plan ID %s", plan.ID)
+	_, db := d.querySettings(opts...)
+
+	// Build the query.
+	query := planRatesDS(db, plan.ID)
+	d.LogSQL(query)
+
+	// Execute the query and scan the results.
+	err := query.ScanStructsContext(ctx, &plan.Rates)
+	if err != nil {
+		return errors.Wrap(err, wrapMsg)
+	}
+
+	return nil
+}
+
+func (d *Database) loadPlanDetails(ctx context.Context, plan *Plan, opts ...QueryOption) error {
+	err := d.loadPlanQuotaDefaults(ctx, plan, opts...)
+	if err != nil {
+		return err
+	}
+
+	err = d.loadPlanRates(ctx, plan, opts...)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -147,18 +191,33 @@ func (d *Database) AddPlan(ctx context.Context, plan *Plan, opts ...QueryOption)
 	}
 
 	for _, pqd := range plan.QuotaDefaults {
-		newDS := db.Insert(t.PQD).
+		pqdDS := db.Insert(t.PQD).
 			Rows(
 				goqu.Record{
 					"plan_id":          newPlanID,
 					"resource_type_id": pqd.ResourceType.ID,
 					"quota_value":      pqd.QuotaValue,
+					"effective_date":   pqd.EffectiveDate,
 				},
 			).Executor()
 
-		if _, err := newDS.ExecContext(ctx); err !=
-			nil {
+		if _, err := pqdDS.ExecContext(ctx); err != nil {
 			return "", errors.Wrap(err, "unable to add plan quota defaults")
+		}
+	}
+
+	for _, pr := range plan.Rates {
+		prDS := db.Insert(t.PlanRates).
+			Rows(
+				goqu.Record{
+					"plan_id":        newPlanID,
+					"effective_date": pr.EffectiveDate,
+					"rate":           pr.Rate,
+				},
+			).Executor()
+
+		if _, err := prDS.ExecContext(ctx); err != nil {
+			return "", errors.Wrap(err, "unable to add plan rates")
 		}
 	}
 

@@ -71,6 +71,7 @@ func main() {
 	shutdown := otelutils.TracerProviderFromEnv(tracerCtx, serviceName, func(e error) { log.Fatal(e) })
 	defer shutdown()
 
+	//nolint:staticcheck
 	nats.RegisterEncoder("protojson", protobufjson.NewCodec(protobufjson.WithEmitUnpopulated()))
 
 	config, err = cfg.Init(&cfg.Settings{
@@ -145,6 +146,7 @@ func main() {
 
 	a := app.New(natsClient, dbconn, userSuffix)
 
+	//nolint:staticcheck
 	natsHandlers := map[string]nats.Handler{
 		qmssubs.GetUserUpdates: a.GetUserUpdatesHandler,
 		qmssubs.AddUserUpdate:  a.AddUserUpdateHandler,

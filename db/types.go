@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/cyverse-de/p/go/qms"
@@ -48,6 +49,11 @@ const QuotasTrackedMetric = "quotas"
 
 const DefaultPlanName = "Basic"
 
+type PlanQuotaDefaultKey struct {
+	ResourceTypeID string
+	EffectiveDate  int64
+}
+
 type UpdateOperation struct {
 	ID   string `db:"id" goqu:"defaultifempty"`
 	Name string `db:"name"`
@@ -88,6 +94,16 @@ func NewResourceTypeFromQMS(q *qms.ResourceType) *ResourceType {
 		Unit:       q.Unit,
 		Consumable: q.Consumable,
 	}
+}
+
+func (rt ResourceType) ValidateForPlan() error {
+
+	// We must have enough information to at least attempt to look up the resource type.
+	if rt.ID == "" && rt.Name == "" {
+		return fmt.Errorf("either the resource type name or the resource type ID is required")
+	}
+
+	return nil
 }
 
 var ResourceTypeNames = []string{
@@ -132,6 +148,7 @@ type Subscription struct {
 	LastModifiedBy     string    `db:"last_modified_by"`
 	LastModifiedAt     string    `db:"last_modified_at" goqu:"defaultifempty"`
 	Paid               bool      `db:"paid" goqu:"defaultifempty"`
+	Rate               PlanRate  `db:"plan_rates"`
 }
 
 func NewSubscriptionFromQMS(s *qms.Subscription) *Subscription {
@@ -159,6 +176,7 @@ func NewSubscriptionFromQMS(s *qms.Subscription) *Subscription {
 		CreatedBy:      s.User.Username,
 		LastModifiedBy: s.User.Username,
 		Paid:           s.Paid,
+		Rate:           *NewPlanRateFromQMS(s.PlanRate, s.Plan.Uuid),
 	}
 }
 
@@ -169,7 +187,7 @@ func (up Subscription) ToQMSSubscription() *qms.Subscription {
 		quotas[i] = quota.ToQMSQuota()
 	}
 
-	// Convert th elist of usages.
+	// Convert the list of usages.
 	usages := make([]*qms.Usage, len(up.Usages))
 	for i, usage := range up.Usages {
 		usages[i] = usage.ToQMSUsage()
@@ -184,6 +202,7 @@ func (up Subscription) ToQMSSubscription() *qms.Subscription {
 		Quotas:             quotas,
 		Usages:             usages,
 		Paid:               up.Paid,
+		PlanRate:           up.Rate.ToQMSPlanRate(),
 	}
 }
 
@@ -192,18 +211,24 @@ type Plan struct {
 	Name          string             `db:"name"`
 	Description   string             `db:"description"`
 	QuotaDefaults []PlanQuotaDefault `db:"-"`
+	Rates         []PlanRate         `db:"-"`
 }
 
 func NewPlanFromQMS(q *qms.Plan) *Plan {
-	pqd := make([]PlanQuotaDefault, 0)
-	for _, qd := range q.PlanQuotaDefaults {
-		pqd = append(pqd, *NewPlanQuotaDefaultFromQMS(qd, q.Uuid))
+	pqd := make([]PlanQuotaDefault, len(q.PlanQuotaDefaults))
+	for i, qd := range q.PlanQuotaDefaults {
+		pqd[i] = *NewPlanQuotaDefaultFromQMS(qd, q.Uuid)
+	}
+	pr := make([]PlanRate, len(q.PlanRates))
+	for i, r := range q.PlanRates {
+		pr[i] = *NewPlanRateFromQMS(r, q.Uuid)
 	}
 	return &Plan{
 		ID:            q.Uuid,
 		Name:          q.Name,
 		Description:   q.Description,
 		QuotaDefaults: pqd,
+		Rates:         pr,
 	}
 }
 
@@ -213,37 +238,212 @@ func (p Plan) ToQMSPlan() *qms.Plan {
 	for i, quotaDefault := range p.QuotaDefaults {
 		quotaDefaults[i] = quotaDefault.ToQMSQuotaDefault()
 	}
+	rates := make([]*qms.PlanRate, len(p.Rates))
+	for i, rate := range p.Rates {
+		rates[i] = rate.ToQMSPlanRate()
+	}
 
 	return &qms.Plan{
 		Uuid:              p.ID,
 		Name:              p.Name,
 		Description:       p.Description,
 		PlanQuotaDefaults: quotaDefaults,
+		PlanRates:         rates,
 	}
 }
 
+func (p Plan) GetActiveRate() *PlanRate {
+	now := time.Now()
+
+	var effectiveRate *PlanRate
+	for _, pr := range p.Rates {
+		if pr.EffectiveDate.After(now) {
+			break
+		}
+		effectiveRate = &pr
+	}
+
+	return effectiveRate
+}
+
+func (p Plan) GetActiveQuotaDefaults() []*PlanQuotaDefault {
+	now := time.Now()
+
+	pqdMap := make(map[string]*PlanQuotaDefault)
+	for _, pqd := range p.QuotaDefaults {
+		if pqd.EffectiveDate.After(now) {
+			break
+		}
+		pqdMap[pqd.ResourceType.Name] = &pqd
+	}
+
+	index := 0
+	pqds := make([]*PlanQuotaDefault, len(pqdMap))
+	for _, pqd := range pqdMap {
+		pqds[index] = pqd
+		index++
+	}
+
+	return pqds
+}
+
+func (p Plan) Validate() error {
+
+	// The plan name and description are both required.
+	if p.Name == "" {
+		return fmt.Errorf("a plan name is required")
+	}
+	if p.Description == "" {
+		return fmt.Errorf("a plan description is required")
+	}
+
+	// Validate the quota defaults.
+	for _, qd := range p.QuotaDefaults {
+		if err := qd.ValidateForPlan(); err != nil {
+			return err
+		}
+	}
+
+	// Validate the plan rates.
+	for _, r := range p.Rates {
+		if err := r.ValidateForPlan(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (p Plan) ValidateQuotaDefaultUniqueness() error {
+
+	// Verify that there's only one quota default per resource type and effective date.
+	uniquePlanQuotaDefaults := make(map[PlanQuotaDefaultKey]bool)
+	for _, qd := range p.QuotaDefaults {
+		key := qd.Key()
+		if uniquePlanQuotaDefaults[key] {
+			return fmt.Errorf("there can only be one quota default for each resource type and effective date")
+		} else {
+			uniquePlanQuotaDefaults[key] = true
+		}
+	}
+
+	return nil
+}
+
+func (p Plan) ValidatePlanRateUniqueness() error {
+
+	// Verify that there's only one rate per effective date.
+	uniquePlanRates := make(map[int64]bool)
+	for _, r := range p.Rates {
+		key := r.EffectiveDate.UnixMicro()
+		if uniquePlanRates[key] {
+			return fmt.Errorf("there can only be one plan rate for each effective date")
+		} else {
+			uniquePlanRates[key] = true
+		}
+	}
+
+	return nil
+}
+
 type PlanQuotaDefault struct {
-	ID           string       `db:"id" goqu:"defaultifempty"`
-	PlanID       string       `db:"plan_id"`
-	QuotaValue   float64      `db:"quota_value"`
-	ResourceType ResourceType `db:"resource_types"`
+	ID            string       `db:"id" goqu:"defaultifempty"`
+	PlanID        string       `db:"plan_id"`
+	QuotaValue    float64      `db:"quota_value"`
+	ResourceType  ResourceType `db:"resource_types"`
+	EffectiveDate time.Time    `db:"effective_date"`
 }
 
 func NewPlanQuotaDefaultFromQMS(q *qms.QuotaDefault, planID string) *PlanQuotaDefault {
+	var effectiveDate time.Time
+	if q.EffectiveDate != nil {
+		effectiveDate = q.EffectiveDate.AsTime()
+	}
 	return &PlanQuotaDefault{
-		ID:           q.Uuid,
-		PlanID:       planID,
-		QuotaValue:   q.QuotaValue,
-		ResourceType: *NewResourceTypeFromQMS(q.ResourceType),
+		ID:            q.Uuid,
+		PlanID:        planID,
+		QuotaValue:    q.QuotaValue,
+		ResourceType:  *NewResourceTypeFromQMS(q.ResourceType),
+		EffectiveDate: effectiveDate,
 	}
 }
 
 func (pqd PlanQuotaDefault) ToQMSQuotaDefault() *qms.QuotaDefault {
 	return &qms.QuotaDefault{
-		Uuid:         pqd.ID,
-		QuotaValue:   pqd.QuotaValue,
-		ResourceType: pqd.ResourceType.ToQMSResourceType(),
+		Uuid:          pqd.ID,
+		QuotaValue:    pqd.QuotaValue,
+		ResourceType:  pqd.ResourceType.ToQMSResourceType(),
+		EffectiveDate: timestamppb.New(pqd.EffectiveDate),
 	}
+}
+
+func (pqd PlanQuotaDefault) ValidateForPlan() error {
+
+	// The default quota value must be specified and greater than zero.
+	if pqd.QuotaValue <= 0 {
+		return fmt.Errorf("plan quota default values must be specified and greater than zero")
+	}
+
+	// The effective date must be specified.
+	if pqd.EffectiveDate.IsZero() {
+		return fmt.Errorf("all plan quota defaults must have an effective date")
+	}
+
+	return pqd.ResourceType.ValidateForPlan()
+}
+
+func (pqd PlanQuotaDefault) Key() PlanQuotaDefaultKey {
+	return PlanQuotaDefaultKey{
+		ResourceTypeID: pqd.ResourceType.ID,
+		EffectiveDate:  pqd.EffectiveDate.UnixMicro(),
+	}
+}
+
+type PlanRate struct {
+	ID            string    `db:"id" goqu:"defaultifempty"`
+	PlanID        string    `db:"plan_id"`
+	EffectiveDate time.Time `db:"effective_date"`
+	Rate          float64   `db:"rate"`
+}
+
+func NewPlanRateFromQMS(r *qms.PlanRate, planID string) *PlanRate {
+	var effectiveDate time.Time
+	if r.EffectiveDate != nil {
+		effectiveDate = r.EffectiveDate.AsTime()
+	}
+	return &PlanRate{
+		ID:            r.Uuid,
+		PlanID:        planID,
+		EffectiveDate: effectiveDate,
+		Rate:          r.Rate,
+	}
+}
+
+func (pr PlanRate) ToQMSPlanRate() *qms.PlanRate {
+	return &qms.PlanRate{
+		Uuid:          pr.ID,
+		EffectiveDate: timestamppb.New(pr.EffectiveDate),
+		Rate:          pr.Rate,
+	}
+}
+
+func (pr PlanRate) Validate() error {
+
+	// The rate can't be negative.
+	if pr.Rate < 0 {
+		return fmt.Errorf("the plan rate must not be less than zero")
+	}
+
+	// The effective date has to be specified.
+	if pr.EffectiveDate.IsZero() {
+		return fmt.Errorf("the effective date of the plan rate must be specified")
+	}
+
+	return nil
+}
+
+func (pr PlanRate) ValidateForPlan() error {
+	return pr.Validate()
 }
 
 type Usage struct {
@@ -336,19 +536,29 @@ type Addon struct {
 	ResourceType  ResourceType `db:"resource_types"`
 	DefaultAmount float64      `db:"default_amount"`
 	DefaultPaid   bool         `db:"default_paid"`
+	AddonRates    []AddonRate  `db:"-"`
 }
 
 func NewAddonFromQMS(q *qms.Addon) *Addon {
+	addonRates := make([]AddonRate, len(q.AddonRates))
+	for i, r := range q.AddonRates {
+		addonRates[i] = *NewAddonRateFromQMS(r, q.Uuid)
+	}
 	return &Addon{
 		Name:          q.Name,
 		Description:   q.Description,
 		DefaultAmount: q.DefaultAmount,
 		DefaultPaid:   q.DefaultPaid,
 		ResourceType:  *NewResourceTypeFromQMS(q.ResourceType),
+		AddonRates:    addonRates,
 	}
 }
 
 func (a *Addon) ToQMSType() *qms.Addon {
+	addonRates := make([]*qms.AddonRate, len(a.AddonRates))
+	for i, r := range a.AddonRates {
+		addonRates[i] = r.ToQMSType()
+	}
 	return &qms.Addon{
 		Uuid:          a.ID,
 		Name:          a.Name,
@@ -360,21 +570,120 @@ func (a *Addon) ToQMSType() *qms.Addon {
 			Name: a.ResourceType.Name,
 			Unit: a.ResourceType.Unit,
 		},
+		AddonRates: addonRates,
 	}
 }
 
+func (a *Addon) Validate() error {
+
+	// The name and description are both required.
+	if a.Name == "" {
+		return fmt.Errorf("name must be set")
+	}
+	if a.Description == "" {
+		return fmt.Errorf("description must be set")
+	}
+
+	// The default amount must be positive.
+	if a.DefaultAmount <= 0.0 {
+		return fmt.Errorf("default_amount must be greater than 0.0")
+	}
+
+	// Verify that we have enough information to attempt to look up the resource type.
+	if err := a.ResourceType.ValidateForPlan(); err != nil {
+		return err
+	}
+
+	// Validate the incoming addon rates.
+	return nil
+}
+
+func (a *Addon) ValidateAddonRateUniqueness() error {
+
+	// Verify that there's only one rate per effective date.
+	uniqueAddonRates := make(map[int64]bool)
+	for _, r := range a.AddonRates {
+		key := r.EffectiveDate.UnixMicro()
+		if uniqueAddonRates[key] {
+			return fmt.Errorf("there can only be one plan rate for each effective date")
+		} else {
+			uniqueAddonRates[key] = true
+		}
+	}
+
+	return nil
+}
+
+// GetCurrentRate determines the rate that is currently active.
+func (a *Addon) GetCurrentRate() *AddonRate {
+	var currentRate *AddonRate
+	now := time.Now()
+	for _, r := range a.AddonRates {
+		if r.EffectiveDate.After(now) {
+			break
+		}
+		currentRate = &r
+	}
+	return currentRate
+}
+
+type AddonRate struct {
+	ID            string    `db:"id" goqu:"defaultifempty,skipupdate"`
+	AddonID       string    `db:"addon_id"`
+	EffectiveDate time.Time `db:"effective_date"`
+	Rate          float64   `db:"rate"`
+}
+
+func NewAddonRateFromQMS(r *qms.AddonRate, addonID string) *AddonRate {
+	var effectiveDate time.Time
+	if r.EffectiveDate != nil {
+		effectiveDate = r.EffectiveDate.AsTime()
+	}
+	return &AddonRate{
+		ID:            r.Uuid,
+		AddonID:       addonID,
+		EffectiveDate: effectiveDate,
+		Rate:          r.Rate,
+	}
+}
+
+func (r *AddonRate) ToQMSType() *qms.AddonRate {
+	return &qms.AddonRate{
+		Uuid:          r.ID,
+		EffectiveDate: timestamppb.New(r.EffectiveDate),
+		Rate:          r.Rate,
+	}
+}
+
+func (r *AddonRate) Validate() error {
+
+	// The rate can't be negative.
+	if r.Rate < 0 {
+		return fmt.Errorf("the plan rate must not be less than zero")
+	}
+
+	// The effective date has to be specified.
+	if r.EffectiveDate.IsZero() {
+		return fmt.Errorf("the effective date of the plan rate must be specified")
+	}
+
+	return nil
+}
+
 type UpdateAddon struct {
-	ID                  string  `db:"id" goqu:"skipupdate"`
-	Name                string  `db:"name"`
-	UpdateName          bool    `db:"-"`
-	Description         string  `db:"description"`
-	UpdateDescription   bool    `db:"-"`
-	ResourceTypeID      string  `db:"resource_type_id"`
-	UpdateResourceType  bool    `db:"-"`
-	DefaultAmount       float64 `db:"default_amount"`
-	UpdateDefaultAmount bool    `db:"-"`
-	DefaultPaid         bool    `db:"default_paid"`
-	UpdateDefaultPaid   bool    `db:"-"`
+	ID                  string      `db:"id" goqu:"skipupdate"`
+	Name                string      `db:"name"`
+	UpdateName          bool        `db:"-"`
+	Description         string      `db:"description"`
+	UpdateDescription   bool        `db:"-"`
+	ResourceTypeID      string      `db:"resource_type_id"`
+	UpdateResourceType  bool        `db:"-"`
+	DefaultAmount       float64     `db:"default_amount"`
+	UpdateDefaultAmount bool        `db:"-"`
+	DefaultPaid         bool        `db:"default_paid"`
+	UpdateDefaultPaid   bool        `db:"-"`
+	AddonRates          []AddonRate `db:"-"`
+	UpdateAddonRates    bool        `db:"-"`
 }
 
 func NewUpdateAddonFromQMS(u *qms.UpdateAddonRequest) *UpdateAddon {
@@ -385,6 +694,7 @@ func NewUpdateAddonFromQMS(u *qms.UpdateAddonRequest) *UpdateAddon {
 		UpdateResourceType:  u.UpdateResourceType,
 		UpdateDefaultAmount: u.UpdateDefaultAmount,
 		UpdateDefaultPaid:   u.UpdateDefaultPaid,
+		UpdateAddonRates:    u.UpdateAddonRates,
 	}
 
 	if update.UpdateName {
@@ -402,6 +712,13 @@ func NewUpdateAddonFromQMS(u *qms.UpdateAddonRequest) *UpdateAddon {
 	if update.UpdateResourceType {
 		update.ResourceTypeID = u.Addon.ResourceType.Uuid
 	}
+	if update.UpdateAddonRates {
+		addonRates := make([]AddonRate, len(u.Addon.AddonRates))
+		for i, r := range u.Addon.AddonRates {
+			addonRates[i] = *NewAddonRateFromQMS(r, u.Addon.Uuid)
+		}
+		update.AddonRates = addonRates
+	}
 	return update
 }
 
@@ -411,6 +728,7 @@ type SubscriptionAddon struct {
 	Subscription Subscription `db:"subscriptions"`
 	Amount       float64      `db:"amount"`
 	Paid         bool         `db:"paid"`
+	Rate         AddonRate    `db:"addon_rates"`
 }
 
 func NewSubscriptionAddonFromQMS(sa *qms.SubscriptionAddon) *SubscriptionAddon {
@@ -420,6 +738,7 @@ func NewSubscriptionAddonFromQMS(sa *qms.SubscriptionAddon) *SubscriptionAddon {
 		Subscription: *NewSubscriptionFromQMS(sa.Subscription),
 		Amount:       float64(sa.Amount),
 		Paid:         sa.Paid,
+		Rate:         *NewAddonRateFromQMS(sa.AddonRate, sa.Uuid),
 	}
 }
 
@@ -430,6 +749,7 @@ func (sa *SubscriptionAddon) ToQMSType() *qms.SubscriptionAddon {
 		Subscription: sa.Subscription.ToQMSSubscription(),
 		Amount:       sa.Amount,
 		Paid:         sa.Paid,
+		AddonRate:    sa.Rate.ToQMSType(),
 	}
 }
 

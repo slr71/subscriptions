@@ -4,3 +4,6 @@ configs/local.yml
 configs/local.yaml
 **/dotenv
 dev-test/
+.env
+local.mod
+local.sum

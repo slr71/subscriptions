@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 
 	t "github.com/cyverse-de/subscriptions/db/tables"
 	"github.com/doug-martin/goqu/v9"
@@ -109,4 +110,20 @@ func (d *Database) GetResourceTypeByName(ctx context.Context, name string, opts 
 	}
 
 	return &resourceType, nil
+}
+
+// LookupResourceType attempts to look up a resource type using either its ID or name in that order. It's an error to
+// attempt a lookup with no ID or name specified.
+func (d *Database) LookupResoureType(
+	ctx context.Context,
+	lookup *ResourceType,
+	opts ...QueryOption,
+) (*ResourceType, error) {
+	if lookup.ID != "" {
+		return d.GetResourceType(ctx, lookup.ID, opts...)
+	} else if lookup.Name != "" {
+		return d.GetResourceTypeByName(ctx, lookup.Name, opts...)
+	} else {
+		return nil, fmt.Errorf("either the resource type ID or name must be specified")
+	}
 }

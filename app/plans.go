@@ -22,27 +22,9 @@ func (a *App) listPlans(ctx context.Context) *qms.PlanList {
 		return response
 	}
 
-	for _, p := range plans {
-		newP := &qms.Plan{
-			Uuid:              p.ID,
-			Name:              p.Name,
-			Description:       p.Description,
-			PlanQuotaDefaults: []*qms.QuotaDefault{},
-		}
-
-		for _, q := range p.QuotaDefaults {
-			newP.PlanQuotaDefaults = append(newP.PlanQuotaDefaults, &qms.QuotaDefault{
-				Uuid:       q.ID,
-				QuotaValue: q.QuotaValue,
-				ResourceType: &qms.ResourceType{
-					Uuid: q.ResourceType.ID,
-					Name: q.ResourceType.Name,
-					Unit: q.ResourceType.Unit,
-				},
-			})
-		}
-
-		response.Plans = append(response.Plans, newP)
+	response.Plans = make([]*qms.Plan, len(plans))
+	for i, p := range plans {
+		response.Plans[i] = p.ToQMSPlan()
 	}
 
 	return response
@@ -83,43 +65,61 @@ func (a *App) addPlan(ctx context.Context, request *qms.AddPlanRequest) *qms.Pla
 
 	d := db.New(a.db)
 
-	var qd []db.PlanQuotaDefault
-	var newPlanID string
 	tx, err := d.Begin()
 	if err != nil {
 		response.Error = errors.NatsError(ctx, err)
 		return response
 	}
 	err = tx.Wrap(func() error {
-		var err error
-
-		for _, pqd := range request.Plan.PlanQuotaDefaults {
-			qd = append(qd, db.PlanQuotaDefault{
-				QuotaValue: float64(pqd.QuotaValue),
-				ResourceType: db.ResourceType{
-					ID:   pqd.ResourceType.Uuid,
-					Name: pqd.ResourceType.Name,
-					Unit: pqd.ResourceType.Unit,
-				},
-			})
+		incomingPlan := db.NewPlanFromQMS(request.Plan)
+		err := incomingPlan.Validate()
+		if err != nil {
+			return err
 		}
 
-		newPlanID, err = d.AddPlan(ctx, &db.Plan{
-			Name:          request.Plan.Name,
-			Description:   request.Plan.Description,
-			QuotaDefaults: qd,
-		}, db.WithTX(tx))
+		existingPlan, err := d.GetPlanByName(ctx, incomingPlan.Name, db.WithTX(tx))
+		if err != nil {
+			return err
+		} else if existingPlan != nil {
+			return fmt.Errorf("a plan named %s already exists", incomingPlan.Name)
+		}
 
-		return err
+		for i, pqd := range incomingPlan.QuotaDefaults {
+			rt, err := d.LookupResoureType(ctx, &pqd.ResourceType, db.WithTX(tx))
+			if err != nil {
+				return err
+			}
+			incomingPlan.QuotaDefaults[i].ResourceType = *rt
+		}
+
+		err = incomingPlan.ValidateQuotaDefaultUniqueness()
+		if err != nil {
+			return err
+		}
+
+		err = incomingPlan.ValidatePlanRateUniqueness()
+		if err != nil {
+			return err
+		}
+
+		newPlanID, err := d.AddPlan(ctx, incomingPlan, db.WithTX(tx))
+		if err != nil {
+			return err
+		}
+
+		plan, err := d.GetPlanByID(ctx, newPlanID, db.WithTX(tx))
+		if err != nil {
+			return err
+		}
+
+		response.Plan = plan.ToQMSPlan()
+		return nil
 	})
 
 	if err != nil {
 		response.Error = errors.NatsError(ctx, err)
 		return response
 	}
-
-	response.Plan = request.Plan
-	response.Plan.Uuid = newPlanID
 
 	return response
 }
