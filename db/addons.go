@@ -242,12 +242,47 @@ func (d *Database) UpdateAddonRate(ctx context.Context, r AddonRate, opts ...Que
 	return nil
 }
 
-func (d *Database) UpdateAddon(
-	ctx context.Context,
-	addonUpdateRecord *UpdateAddon,
-	opts ...QueryOption,
-) (*Addon, error) {
-	var retval *Addon
+func (d *Database) UpdateAddonRates(ctx context.Context, addonUpdateRecord *UpdateAddon, opts ...QueryOption) error {
+	_, db := d.querySettings(opts...)
+
+	// Delete any existing addon rates that aren't mentioned in the incoming request.
+	var addonRateIDs []string
+	for _, r := range addonUpdateRecord.AddonRates {
+		if r.ID != "" {
+			addonRateIDs = append(addonRateIDs, r.ID)
+		}
+	}
+	if len(addonRateIDs) != 0 {
+		ds := db.From(t.AddonRates).
+			Where(goqu.Ex{
+				"addon_id": addonUpdateRecord.ID,
+				"id":       goqu.Op{"notIn": addonRateIDs},
+			}).
+			Delete().
+			Executor()
+		if _, err := ds.ExecContext(ctx); err != nil {
+			return err
+		}
+	}
+
+	for _, r := range addonUpdateRecord.AddonRates {
+		if r.ID == "" {
+			err := d.AddAddonRate(ctx, r, opts...)
+			if err != nil {
+				return err
+			}
+		} else {
+			err := d.UpdateAddonRate(ctx, r, opts...)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (d *Database) UpdateAddon(ctx context.Context, addonUpdateRecord *UpdateAddon, opts ...QueryOption) error {
 	_, db := d.querySettings(opts...)
 
 	rec := goqu.Record{}
@@ -279,44 +314,30 @@ func (d *Database) UpdateAddon(
 		ds := db.Update(t.Addons).
 			Set(rec).
 			Where(t.Addons.Col("id").Eq(addonUpdateRecord.ID)).
-			Returning(
-				t.Addons.Col("id"),
-				t.Addons.Col("name"),
-				t.Addons.Col("description"),
-				t.Addons.Col("default_amount"),
-				t.Addons.Col("default_paid"),
-				t.Addons.Col("resource_type_id").As(goqu.C("resource_types.id")),
-			).
 			Executor()
 
-		retval := &Addon{}
-		found, err := ds.ScanStructContext(ctx, retval)
+		r, err := ds.ExecContext(ctx)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to scan results of update")
+			return errors.Wrap(err, "unable to execute the update")
 		}
-		if !found {
-			return nil, suberrors.ErrAddonNotFound
+		rowsAffected, err := r.RowsAffected()
+		if err != nil {
+			return errors.Wrap(err, "unable to determine how many rows were affected")
+		}
+		if rowsAffected == 0 {
+			return suberrors.ErrAddonNotFound
 		}
 	}
 
 	// Update existing addon rates.
 	if addonUpdateRecord.UpdateAddonRates {
-		for _, r := range addonUpdateRecord.AddonRates {
-			if r.ID == "" {
-				err := d.AddAddonRate(ctx, r, opts...)
-				if err != nil {
-					return nil, err
-				}
-			} else {
-				err := d.UpdateAddonRate(ctx, r, opts...)
-				if err != nil {
-					return nil, err
-				}
-			}
+		err := d.UpdateAddonRates(ctx, addonUpdateRecord, opts...)
+		if err != nil {
+			return errors.Wrap(err, "unable to update the addon rates for the addon")
 		}
 	}
 
-	return retval, nil
+	return nil
 }
 
 func (d *Database) DeleteAddon(ctx context.Context, addonID string, opts ...QueryOption) error {

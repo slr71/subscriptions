@@ -180,7 +180,7 @@ func (a *App) updateAddon(ctx context.Context, request *qms.UpdateAddonRequest) 
 		return response
 	}
 	err = tx.Wrap(func() error {
-		_, err := d.UpdateAddon(ctx, updateAddon, db.WithTX(tx))
+		err := d.UpdateAddon(ctx, updateAddon, db.WithTX(tx))
 		if err != nil {
 			return err
 		}
