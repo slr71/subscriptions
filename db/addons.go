@@ -31,7 +31,7 @@ func (d *Database) AddAddon(ctx context.Context, addon *Addon, opts ...QueryOpti
 	}
 
 	// Add the addon rates.
-	addonRateRows := make([]interface{}, len(addon.AddonRates))
+	addonRateRows := make([]any, len(addon.AddonRates))
 	for i, r := range addon.AddonRates {
 		addonRateRows[i] = goqu.Record{
 			"addon_id":       newAddonID,
@@ -203,37 +203,15 @@ func (d *Database) ToggleAddonPaid(ctx context.Context, addonID string, opts ...
 	return retval, nil
 }
 
-func (d *Database) AddAddonRate(ctx context.Context, r AddonRate, opts ...QueryOption) error {
+func (d *Database) UpsertAddonRate(ctx context.Context, r AddonRate, opts ...QueryOption) error {
 	_, db := d.querySettings(opts...)
+
+	// Create the addon record.
+	rec := r.ToRec()
 
 	ds := db.Insert(t.AddonRates).
-		Rows(
-			goqu.Record{
-				"addon_id":       r.AddonID,
-				"effective_date": r.EffectiveDate,
-				"rate":           r.Rate,
-			},
-		).
-		Executor()
-	if _, err := ds.ExecContext(ctx); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (d *Database) UpdateAddonRate(ctx context.Context, r AddonRate, opts ...QueryOption) error {
-	_, db := d.querySettings(opts...)
-
-	ds := db.Update(t.AddonRates).
-		Set(
-			goqu.Record{
-				"addon_id":       r.AddonID,
-				"effective_date": r.EffectiveDate,
-				"rate":           r.Rate,
-			},
-		).
-		Where(t.AddonRates.Col("id").Eq(r.ID)).
+		Rows(rec).
+		OnConflict(goqu.DoUpdate("id", rec)).
 		Executor()
 	if _, err := ds.ExecContext(ctx); err != nil {
 		return err
@@ -266,16 +244,9 @@ func (d *Database) UpdateAddonRates(ctx context.Context, addonUpdateRecord *Upda
 	}
 
 	for _, r := range addonUpdateRecord.AddonRates {
-		if r.ID == "" {
-			err := d.AddAddonRate(ctx, r, opts...)
-			if err != nil {
-				return err
-			}
-		} else {
-			err := d.UpdateAddonRate(ctx, r, opts...)
-			if err != nil {
-				return err
-			}
+		err := d.UpsertAddonRate(ctx, r, opts...)
+		if err != nil {
+			return err
 		}
 	}
 

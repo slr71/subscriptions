@@ -655,6 +655,18 @@ func (r *AddonRate) ToQMSType() *qms.AddonRate {
 	}
 }
 
+func (r *AddonRate) ToRec() goqu.Record {
+	var rec = map[string]any{
+		"addon_id":       r.AddonID,
+		"effective_date": r.EffectiveDate,
+		"rate":           r.Rate,
+	}
+	if r.ID != "" {
+		rec["id"] = r.ID
+	}
+	return goqu.Record(rec)
+}
+
 func (r *AddonRate) Validate() error {
 
 	// The rate can't be negative.
