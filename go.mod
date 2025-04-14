@@ -1,6 +1,6 @@
 module github.com/cyverse-de/subscriptions
 
-go 1.23.3
+go 1.24.2
 
 require (
 	github.com/cyverse-de/go-mod/cfg v0.0.2
@@ -10,7 +10,7 @@ require (
 	github.com/cyverse-de/go-mod/pbinit v0.1.13
 	github.com/cyverse-de/go-mod/protobufjson v0.0.7
 	github.com/cyverse-de/go-mod/subjects v0.1.5
-	github.com/cyverse-de/p/go/qms v0.1.15
+	github.com/cyverse-de/p/go/qms v0.2.0
 	github.com/cyverse-de/p/go/requests v0.0.3
 	github.com/cyverse-de/p/go/svcerror v0.0.8
 	github.com/doug-martin/goqu/v9 v9.19.0
@@ -25,7 +25,7 @@ require (
 	github.com/uptrace/opentelemetry-go-extra/otelsql v0.3.2
 	github.com/uptrace/opentelemetry-go-extra/otelsqlx v0.3.2
 	go.opentelemetry.io/otel v1.31.0
-	google.golang.org/protobuf v1.35.2
+	google.golang.org/protobuf v1.36.6
 )
 
 require (
