@@ -402,10 +402,16 @@ func (d *Database) LoadSubscriptionDetails(ctx context.Context, subscription *Su
 		return err
 	}
 
+	addons, err := d.ListSubscriptionAddons(ctx, subscription.ID, opts...)
+	if err != nil {
+		return err
+	}
+
 	subscription.Plan.QuotaDefaults = defaults
 	subscription.Plan.Rates = planRates
 	subscription.Quotas = quotas
 	subscription.Usages = usages
+	subscription.SubscriptionAddons = addons
 
 	return nil
 }

@@ -337,36 +337,16 @@ func subAddonDS(db GoquDatabase) *goqu.SelectDataset {
 			t.ResourceTypes.Col("name").As(goqu.C("addons.resource_types.name")),
 			t.ResourceTypes.Col("unit").As(goqu.C("addons.resource_types.unit")),
 
-			t.Subscriptions.Col("id").As(goqu.C("subscriptions.id")),
-			t.Subscriptions.Col("effective_start_date").As(goqu.C("subscriptions.effective_start_date")),
-			t.Subscriptions.Col("effective_end_date").As(goqu.C("subscriptions.effective_end_date")),
-			t.Subscriptions.Col("created_by").As(goqu.C("subscriptions.created_by")),
-			t.Subscriptions.Col("created_at").As(goqu.C("subscriptions.created_at")),
-			t.Subscriptions.Col("last_modified_by").As(goqu.C("subscriptions.last_modified_by")),
-			t.Subscriptions.Col("last_modified_at").As(goqu.C("subscriptions.last_modified_at")),
-			t.Subscriptions.Col("paid").As(goqu.C("subscriptions.paid")),
-			t.PlanRates.Col("id").As(goqu.C("subscriptions.plan_rates.id")),
-			t.PlanRates.Col("effective_date").As(goqu.C("subscriptions.plan_rates.effective_date")),
-			t.PlanRates.Col("rate").As(goqu.C("subscriptions.plan_rates.rate")),
-			t.Users.Col("id").As(goqu.C("subscriptions.users.id")),
-			t.Users.Col("username").As(goqu.C("subscriptions.users.username")),
-			t.Plans.Col("id").As(goqu.C("subscriptions.plans.id")),
-			t.Plans.Col("name").As(goqu.C("subscriptions.plans.name")),
-			t.Plans.Col("description").As(goqu.C("subscriptions.plans.description")),
-
 			t.SubscriptionAddons.Col("amount"),
 			t.SubscriptionAddons.Col("paid"),
+			t.SubscriptionAddons.Col("subscription_id"),
 
 			t.AddonRates.Col("id").As(goqu.C("addon_rates.id")),
 			t.AddonRates.Col("effective_date").As(goqu.C("addon_rates.effective_date")),
 			t.AddonRates.Col("rate").As(goqu.C("addon_rates.rate")),
 		).
-		Join(t.Subscriptions, goqu.On(t.SubscriptionAddons.Col("subscription_id").Eq(t.Subscriptions.Col("id")))).
-		Join(t.PlanRates, goqu.On(t.Subscriptions.Col("plan_rate_id").Eq(t.PlanRates.Col("id")))).
 		Join(t.Addons, goqu.On(t.Addons.Col("id").Eq(t.SubscriptionAddons.Col("addon_id")))).
 		Join(t.ResourceTypes, goqu.On(t.Addons.Col("resource_type_id").Eq(t.ResourceTypes.Col("id")))).
-		Join(t.Users, goqu.On(t.Subscriptions.Col("user_id").Eq(t.Users.Col("id")))).
-		Join(t.Plans, goqu.On(t.Subscriptions.Col("plan_id").Eq(t.Plans.Col("id")))).
 		Join(t.AddonRates, goqu.On(t.SubscriptionAddons.Col("addon_rate_id").Eq(t.AddonRates.Col("id"))))
 }
 
@@ -399,7 +379,7 @@ func (d *Database) ListSubscriptionAddons(
 	_, db := d.querySettings(opts...)
 
 	ds := subAddonDS(db).
-		Where(t.Subscriptions.Col("id").Eq(subscriptionID)).
+		Where(t.SubscriptionAddons.Col("subscription_id").Eq(subscriptionID)).
 		Executor()
 	d.LogSQL(ds)
 
@@ -454,11 +434,6 @@ func (d *Database) AddSubscriptionAddon(
 		return nil, err
 	}
 
-	subscription, err := d.GetSubscriptionByID(ctx, subscriptionID, WithTXRollbackCommit(db, false, false))
-	if err != nil {
-		return nil, err
-	}
-
 	if qs.doCommit {
 		if err = db.Commit(); err != nil {
 			return nil, err
@@ -466,12 +441,12 @@ func (d *Database) AddSubscriptionAddon(
 	}
 
 	retval := &SubscriptionAddon{
-		ID:           newAddonID,
-		Addon:        *addon,
-		Subscription: *subscription,
-		Amount:       addon.DefaultAmount,
-		Paid:         addon.DefaultPaid,
-		Rate:         *addonRate,
+		ID:             newAddonID,
+		Addon:          *addon,
+		SubscriptionID: subscriptionID,
+		Amount:         addon.DefaultAmount,
+		Paid:           addon.DefaultPaid,
+		Rate:           *addonRate,
 	}
 
 	return retval, nil
@@ -532,30 +507,11 @@ func (d *Database) UpdateSubscriptionAddon(ctx context.Context, updated *UpdateS
 		return nil, err
 	}
 
-	usages, err := d.SubscriptionUsages(ctx, retval.Subscription.ID, WithTXRollbackCommit(db, false, false))
-	if err != nil {
-		return nil, err
-	}
-
-	quotas, err := d.SubscriptionQuotas(ctx, retval.Subscription.ID, WithTXRollbackCommit(db, false, false))
-	if err != nil {
-		return nil, err
-	}
-
-	pqd, err := d.SubscriptionQuotaDefaults(ctx, retval.Subscription.Plan.ID, WithTXRollbackCommit(db, false, false))
-	if err != nil {
-		return nil, err
-	}
-
 	if qs.doCommit {
 		if err = db.Commit(); err != nil {
 			return nil, err
 		}
 	}
-
-	retval.Subscription.Usages = usages
-	retval.Subscription.Quotas = quotas
-	retval.Subscription.Plan.QuotaDefaults = pqd
 
 	return retval, nil
 }

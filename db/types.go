@@ -136,19 +136,20 @@ type Update struct {
 }
 
 type Subscription struct {
-	ID                 string    `db:"id" goqu:"defaultifempty"`
-	EffectiveStartDate time.Time `db:"effective_start_date"`
-	EffectiveEndDate   time.Time `db:"effective_end_date"`
-	User               User      `db:"users"`
-	Plan               Plan      `db:"plans"`
-	Quotas             []Quota   `db:"-"`
-	Usages             []Usage   `db:"-"`
-	CreatedBy          string    `db:"created_by"`
-	CreatedAt          time.Time `db:"created_at" goqu:"defaultifempty"`
-	LastModifiedBy     string    `db:"last_modified_by"`
-	LastModifiedAt     string    `db:"last_modified_at" goqu:"defaultifempty"`
-	Paid               bool      `db:"paid" goqu:"defaultifempty"`
-	Rate               PlanRate  `db:"plan_rates"`
+	ID                 string              `db:"id" goqu:"defaultifempty"`
+	EffectiveStartDate time.Time           `db:"effective_start_date"`
+	EffectiveEndDate   time.Time           `db:"effective_end_date"`
+	User               User                `db:"users"`
+	Plan               Plan                `db:"plans"`
+	Quotas             []Quota             `db:"-"`
+	Usages             []Usage             `db:"-"`
+	SubscriptionAddons []SubscriptionAddon `db:"-"`
+	CreatedBy          string              `db:"created_by"`
+	CreatedAt          time.Time           `db:"created_at" goqu:"defaultifempty"`
+	LastModifiedBy     string              `db:"last_modified_by"`
+	LastModifiedAt     string              `db:"last_modified_at" goqu:"defaultifempty"`
+	Paid               bool                `db:"paid" goqu:"defaultifempty"`
+	Rate               PlanRate            `db:"plan_rates"`
 }
 
 func NewSubscriptionFromQMS(s *qms.Subscription) *Subscription {
@@ -193,6 +194,13 @@ func (up Subscription) ToQMSSubscription() *qms.Subscription {
 		usages[i] = usage.ToQMSUsage()
 	}
 
+	// Convert the list of addons.
+	addons := make([]*qms.SubscriptionAddon, len(up.SubscriptionAddons))
+	for i, addon := range up.SubscriptionAddons {
+		addons[i] = addon.ToQMSType()
+		addons[i].SubscriptionId = ""
+	}
+
 	return &qms.Subscription{
 		Uuid:               up.ID,
 		EffectiveStartDate: timestamppb.New(up.EffectiveStartDate),
@@ -203,6 +211,7 @@ func (up Subscription) ToQMSSubscription() *qms.Subscription {
 		Usages:             usages,
 		Paid:               up.Paid,
 		PlanRate:           up.Rate.ToQMSPlanRate(),
+		Addons:             addons,
 	}
 }
 
@@ -735,33 +744,33 @@ func NewUpdateAddonFromQMS(u *qms.UpdateAddonRequest) *UpdateAddon {
 }
 
 type SubscriptionAddon struct {
-	ID           string       `db:"id" goqu:"defaultifempty,skipupdate"`
-	Addon        Addon        `db:"addons"`
-	Subscription Subscription `db:"subscriptions"`
-	Amount       float64      `db:"amount"`
-	Paid         bool         `db:"paid"`
-	Rate         AddonRate    `db:"addon_rates"`
+	ID             string    `db:"id" goqu:"defaultifempty,skipupdate"`
+	Addon          Addon     `db:"addons"`
+	SubscriptionID string    `db:"subscription_id"`
+	Amount         float64   `db:"amount"`
+	Paid           bool      `db:"paid"`
+	Rate           AddonRate `db:"addon_rates"`
 }
 
 func NewSubscriptionAddonFromQMS(sa *qms.SubscriptionAddon) *SubscriptionAddon {
 	return &SubscriptionAddon{
-		ID:           sa.Uuid,
-		Addon:        *NewAddonFromQMS(sa.Addon),
-		Subscription: *NewSubscriptionFromQMS(sa.Subscription),
-		Amount:       float64(sa.Amount),
-		Paid:         sa.Paid,
-		Rate:         *NewAddonRateFromQMS(sa.AddonRate, sa.Uuid),
+		ID:             sa.Uuid,
+		Addon:          *NewAddonFromQMS(sa.Addon),
+		SubscriptionID: sa.SubscriptionId,
+		Amount:         float64(sa.Amount),
+		Paid:           sa.Paid,
+		Rate:           *NewAddonRateFromQMS(sa.AddonRate, sa.Uuid),
 	}
 }
 
 func (sa *SubscriptionAddon) ToQMSType() *qms.SubscriptionAddon {
 	return &qms.SubscriptionAddon{
-		Uuid:         sa.ID,
-		Addon:        sa.Addon.ToQMSType(),
-		Subscription: sa.Subscription.ToQMSSubscription(),
-		Amount:       sa.Amount,
-		Paid:         sa.Paid,
-		AddonRate:    sa.Rate.ToQMSType(),
+		Uuid:           sa.ID,
+		Addon:          sa.Addon.ToQMSType(),
+		SubscriptionId: sa.SubscriptionID,
+		Amount:         sa.Amount,
+		Paid:           sa.Paid,
+		AddonRate:      sa.Rate.ToQMSType(),
 	}
 }
 

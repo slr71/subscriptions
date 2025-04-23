@@ -556,7 +556,7 @@ func (a *App) deleteSubscriptionAddon(ctx context.Context, request *requests.ByU
 	quotaValue, _, err := d.GetCurrentQuota(
 		ctx,
 		subAddon.Addon.ResourceType.ID,
-		subAddon.Subscription.ID,
+		subAddon.SubscriptionID,
 		db.WithTXRollbackCommit(tx, false, false),
 	)
 	if err != nil {
@@ -573,7 +573,7 @@ func (a *App) deleteSubscriptionAddon(ctx context.Context, request *requests.ByU
 		ctx,
 		quotaValue,
 		subAddon.Addon.ResourceType.ID,
-		subAddon.Subscription.ID,
+		subAddon.SubscriptionID,
 		db.WithTXRollbackCommit(tx, false, false),
 	); err != nil {
 		response.Error = serrors.NatsError(ctx, err)
@@ -669,7 +669,7 @@ func (a *App) updateSubscriptionAddon(ctx context.Context, request *qms.UpdateSu
 		quotaValue, _, err := d.GetCurrentQuota(
 			ctx,
 			preUpdateSubAddon.Addon.ResourceType.ID,
-			preUpdateSubAddon.Subscription.ID,
+			preUpdateSubAddon.SubscriptionID,
 			db.WithTXRollbackCommit(tx, false, false),
 		)
 		if err != nil {
@@ -689,7 +689,7 @@ func (a *App) updateSubscriptionAddon(ctx context.Context, request *qms.UpdateSu
 			ctx,
 			quotaValue,
 			preUpdateSubAddon.Addon.ResourceType.ID,
-			preUpdateSubAddon.Subscription.ID,
+			preUpdateSubAddon.SubscriptionID,
 			db.WithTXRollbackCommit(tx, false, false),
 		); err != nil {
 			response.Error = serrors.NatsError(ctx, err)
