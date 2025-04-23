@@ -1,4 +1,4 @@
-FROM golang:1.23 AS build-root
+FROM golang:1.24 AS build-root
 
 WORKDIR /go/src/github.com/cyverse-de/subscriptions
 COPY . .
