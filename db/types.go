@@ -133,6 +133,7 @@ type Update struct {
 	ResourceType    ResourceType    `db:"resource_types"`
 	User            User            `db:"users"`
 	UpdateOperation UpdateOperation `db:"update_operations"`
+	Metadata        string          `db:"metadata"`
 }
 
 type Subscription struct {

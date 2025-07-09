@@ -311,6 +311,7 @@ func (a *App) addUserUpdate(ctx context.Context, request *qms.AddUpdateRequest) 
 				ID:   operationID,
 				Name: request.Update.Operation.Name,
 			},
+			Metadata: request.Update.Metadata,
 		}
 
 		log.Info("adding update to the database")
