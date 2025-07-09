@@ -10,7 +10,7 @@ require (
 	github.com/cyverse-de/go-mod/pbinit v0.1.13
 	github.com/cyverse-de/go-mod/protobufjson v0.0.7
 	github.com/cyverse-de/go-mod/subjects v0.1.5
-	github.com/cyverse-de/p/go/qms v0.2.0
+	github.com/cyverse-de/p/go/qms v0.2.1
 	github.com/cyverse-de/p/go/requests v0.0.3
 	github.com/cyverse-de/p/go/svcerror v0.0.8
 	github.com/doug-martin/goqu/v9 v9.19.0
