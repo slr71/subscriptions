@@ -100,6 +100,7 @@ func (d *Database) AddUserUpdate(ctx context.Context, update *Update, opts ...Qu
 			"update_operation_id": update.UpdateOperation.ID,
 			"resource_type_id":    update.ResourceType.ID,
 			"user_id":             update.User.ID,
+			"metadata":            update.Metadata,
 		},
 	).
 		Returning(goqu.C("id")).
