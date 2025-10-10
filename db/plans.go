@@ -20,6 +20,7 @@ func planQuotaDefaultsDS(db GoquDatabase, planID string) *goqu.SelectDataset {
 			t.RT.Col("id").As(goqu.C("resource_types.id")),
 			t.RT.Col("name").As(goqu.C("resource_types.name")),
 			t.RT.Col("unit").As(goqu.C("resource_types.unit")),
+			t.RT.Col("consumable").As(goqu.C("resource_types.consumable")),
 		).
 		Join(t.RT, goqu.On(t.PQD.Col("resource_type_id").Eq(t.RT.Col("id")))).
 		Where(t.PQD.Col("plan_id").Eq(planID)).

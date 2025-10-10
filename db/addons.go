@@ -61,6 +61,7 @@ func addonDS(db GoquDatabase) *goqu.SelectDataset {
 			t.ResourceTypes.Col("id").As(goqu.C("resource_types.id")),
 			t.ResourceTypes.Col("name").As(goqu.C("resource_types.name")),
 			t.ResourceTypes.Col("unit").As(goqu.C("resource_types.unit")),
+			t.ResourceTypes.Col("consumable").As(goqu.C("resource_types.consumable")),
 		).
 		Join(t.ResourceTypes, goqu.On(t.Addons.Col("resource_type_id").Eq(t.ResourceTypes.Col("id"))))
 }
@@ -107,6 +108,7 @@ func (d *Database) ListAddons(ctx context.Context, opts ...QueryOption) ([]Addon
 			t.ResourceTypes.Col("id").As(goqu.C("resource_types.id")),
 			t.ResourceTypes.Col("name").As(goqu.C("resource_types.name")),
 			t.ResourceTypes.Col("unit").As(goqu.C("resource_types.unit")),
+			t.ResourceTypes.Col("consumable").As(goqu.C("resource_types.consumable")),
 		).
 		Join(t.ResourceTypes, goqu.On(t.Addons.Col("resource_type_id").Eq(t.ResourceTypes.Col("id"))))
 	d.LogSQL(ds)
@@ -183,6 +185,7 @@ func (d *Database) ToggleAddonPaid(ctx context.Context, addonID string, opts ...
 			t.ResourceTypes.Col("id").As(goqu.C("resource_types.id")),
 			t.ResourceTypes.Col("name").As(goqu.C("resource_types.name")),
 			t.ResourceTypes.Col("unit").As(goqu.C("resource_types.unit")),
+			t.ResourceTypes.Col("consumable").As(goqu.C("resource_types.consumable")),
 		).
 		Join(t.ResourceTypes, goqu.On(t.Addons.Col("resource_type_id").Eq(t.ResourceTypes.Col("id")))).
 		Where(t.Addons.Col("id").Eq(addonID)).
@@ -336,6 +339,7 @@ func subAddonDS(db GoquDatabase) *goqu.SelectDataset {
 			t.ResourceTypes.Col("id").As(goqu.C("addons.resource_types.id")),
 			t.ResourceTypes.Col("name").As(goqu.C("addons.resource_types.name")),
 			t.ResourceTypes.Col("unit").As(goqu.C("addons.resource_types.unit")),
+			t.ResourceTypes.Col("consumable").As(goqu.C("addons.resource_types.consumable")),
 
 			t.SubscriptionAddons.Col("amount"),
 			t.SubscriptionAddons.Col("paid"),

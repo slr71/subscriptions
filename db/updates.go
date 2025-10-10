@@ -37,6 +37,7 @@ func (d *Database) UserUpdates(ctx context.Context, username string, opts ...Que
 			t.RT.Col("id").As(goqu.C("resource_types.id")),
 			t.RT.Col("name").As(goqu.C("resource_types.name")),
 			t.RT.Col("unit").As(goqu.C("resource_types.unit")),
+			t.RT.Col("consumable").As(goqu.C("resource_types.consumable")),
 
 			t.UOps.Col("id").As(goqu.C("update_operations.id")),
 			t.UOps.Col("name").As(goqu.C("update_operations.name")),
