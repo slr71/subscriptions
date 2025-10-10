@@ -171,6 +171,7 @@ func (a *App) getUserUpdates(ctx context.Context, request *qms.UpdateListRequest
 				Uuid: mu.ResourceType.ID,
 				Name: mu.ResourceType.Name,
 				Unit: mu.ResourceType.Unit,
+				Consumable: mu.ResourceType.Consumable,
 			},
 			Operation: &qms.UpdateOperation{
 				Uuid: mu.UpdateOperation.ID,
@@ -302,6 +303,7 @@ func (a *App) addUserUpdate(ctx context.Context, request *qms.AddUpdateRequest) 
 				ID:   resourceTypeID,
 				Name: request.Update.ResourceType.Name,
 				Unit: request.Update.ResourceType.Unit,
+				Consumable: request.Update.ResourceType.Consumable,
 			},
 			User: db.User{
 				ID:       userID,
@@ -354,6 +356,7 @@ func (a *App) addUserUpdate(ctx context.Context, request *qms.AddUpdateRequest) 
 				Uuid: update.ResourceType.ID,
 				Name: update.ResourceType.Name,
 				Unit: update.ResourceType.Unit,
+				Consumable: update.ResourceType.Consumable,
 			},
 			EffectiveDate: timestamppb.New(update.EffectiveDate),
 			Operation: &qms.UpdateOperation{

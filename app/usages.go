@@ -45,6 +45,7 @@ func (a *App) getUsages(ctx context.Context, request *qms.GetUsages) *qms.UsageL
 				Uuid: usage.ResourceType.ID,
 				Name: usage.ResourceType.Name,
 				Unit: usage.ResourceType.Unit,
+				Consumable: usage.ResourceType.Consumable,
 			},
 			CreatedAt:      timestamppb.New(usage.CreatedAt),
 			CreatedBy:      usage.CreatedBy,
