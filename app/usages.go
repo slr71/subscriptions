@@ -42,9 +42,9 @@ func (a *App) getUsages(ctx context.Context, request *qms.GetUsages) *qms.UsageL
 			Usage:          usage.Usage,
 			SubscriptionId: subscription.ID,
 			ResourceType: &qms.ResourceType{
-				Uuid: usage.ResourceType.ID,
-				Name: usage.ResourceType.Name,
-				Unit: usage.ResourceType.Unit,
+				Uuid:       usage.ResourceType.ID,
+				Name:       usage.ResourceType.Name,
+				Unit:       usage.ResourceType.Unit,
 				Consumable: usage.ResourceType.Consumable,
 			},
 			CreatedAt:      timestamppb.New(usage.CreatedAt),
@@ -107,53 +107,65 @@ func (a *App) addUsage(ctx context.Context, request *qms.AddUsage) *qms.UsageRes
 
 	d := db.New(a.db)
 
-	subscription, err := d.GetActiveSubscription(ctx, username)
+	// Do most of the work in a transaction.
+	tx, err := d.Begin()
 	if err != nil {
 		response.Error = errors.NatsError(ctx, err)
 		return response
 	}
+	err = tx.Wrap(func() error {
+		// Get the user's current active subscription.
+		subscription, err := d.GetActiveSubscription(ctx, username, db.WithTX(tx))
+		if err != nil {
+			return err
+		}
 
-	// Validate update type.
-	if _, err = d.GetOperationID(ctx, request.UpdateType); err != nil {
-		response.Error = errors.NatsError(ctx, err)
-		return response
-	}
+		// Validate update type.
+		if _, err = d.GetOperationID(ctx, request.UpdateType, db.WithTX(tx)); err != nil {
+			return err
+		}
 
-	resourceID, err := d.GetResourceTypeID(ctx, request.ResourceName, request.ResourceUnit)
+		// Get the resource type ID.
+		resourceType, err := d.GetResourceTypeByName(ctx, request.ResourceName, db.WithTX(tx))
+		if err != nil {
+			return err
+		}
+
+		// Prepare the usage struct.
+		usage = db.Usage{
+			Usage:          request.UsageValue,
+			SubscriptionID: subscription.ID,
+			ResourceType:   *resourceType,
+		}
+
+		// Calculate the updated usage.
+		if err = d.CalculateUsage(ctx, request.UpdateType, &usage, db.WithTX(tx)); err != nil {
+			return err
+		}
+
+		// Get the usages.
+		u, _, err := d.GetCurrentUsage(ctx, resourceType.ID, subscription.ID, db.WithTX(tx))
+		if err != nil {
+			return err
+		}
+
+		// Return the current usage.
+		response.Usage = &qms.Usage{
+			Usage:          u,
+			SubscriptionId: subscription.ID,
+			ResourceType: &qms.ResourceType{
+				Uuid:       resourceType.ID,
+				Name:       resourceType.Name,
+				Unit:       resourceType.Unit,
+				Consumable: resourceType.Consumable,
+			},
+		}
+
+		return nil
+	})
 	if err != nil {
 		response.Error = errors.NatsError(ctx, err)
 		return response
-	}
-
-	usage = db.Usage{
-		Usage:          request.UsageValue,
-		SubscriptionID: subscription.ID,
-		ResourceType: db.ResourceType{
-			ID:   resourceID,
-			Name: request.ResourceName,
-			Unit: request.ResourceUnit,
-		},
-	}
-
-	if err = d.CalculateUsage(ctx, request.UpdateType, &usage); err != nil {
-		response.Error = errors.NatsError(ctx, err)
-		return response
-	}
-
-	u, _, err := d.GetCurrentUsage(ctx, resourceID, subscription.ID)
-	if err != nil {
-		response.Error = errors.NatsError(ctx, err)
-		return response
-	}
-
-	response.Usage = &qms.Usage{
-		Usage:          u,
-		SubscriptionId: subscription.ID,
-		ResourceType: &qms.ResourceType{
-			Uuid: resourceID,
-			Name: request.ResourceName,
-			Unit: request.ResourceUnit,
-		},
 	}
 
 	return response
