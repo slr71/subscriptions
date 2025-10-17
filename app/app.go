@@ -168,9 +168,9 @@ func (a *App) getUserUpdates(ctx context.Context, request *qms.UpdateListRequest
 			ValueType:     mu.ValueType,
 			Value:         mu.Value,
 			ResourceType: &qms.ResourceType{
-				Uuid: mu.ResourceType.ID,
-				Name: mu.ResourceType.Name,
-				Unit: mu.ResourceType.Unit,
+				Uuid:       mu.ResourceType.ID,
+				Name:       mu.ResourceType.Name,
+				Unit:       mu.ResourceType.Unit,
 				Consumable: mu.ResourceType.Consumable,
 			},
 			Operation: &qms.UpdateOperation{
@@ -233,76 +233,84 @@ func (a *App) addUserUpdate(ctx context.Context, request *qms.AddUpdateRequest) 
 
 	response := pbinit.NewQMSAddUpdateResponse()
 
-	d := db.New(a.db)
-
+	// Validate the request.
 	username, err := a.validateUpdate(request)
 	if err != nil {
 		response.Error = errors.NatsError(ctx, err)
 		return response
 	}
 
+	// Add the username to the logger as a field for debugging.
 	log = log.WithFields(logrus.Fields{"user": username})
 
-	// Get the userID if it's not provided
-	if request.Update.User.Uuid == "" {
-		log.Infof("getting user ID for %s", username)
-		user, err := d.EnsureUser(ctx, username)
-		if err != nil {
-			response.Error = errors.NatsError(ctx, err)
-			return response
-		}
-		userID = user.ID
-		log.Infof("user ID for %s is %s", username, userID)
-	} else {
-		userID = request.Update.User.Uuid
-		log.Infof("user ID from request is %s", userID)
-	}
+	// Create a new database client.
+	d := db.New(a.db)
 
-	// Get the resource type id if it's not provided.
-	if request.Update.ResourceType.Uuid == "" {
-		log.Infof("getting resource type id for resource '%s'", request.Update.ResourceType.Name)
-		resourceTypeID, err = d.GetResourceTypeID(
-			ctx,
-			request.Update.ResourceType.Name,
-			request.Update.ResourceType.Unit,
-		)
-		if err != nil {
-			response.Error = errors.NatsError(ctx, err)
-			return response
-		}
-		log.Infof("resource type id for resource %s is '%s'", request.Update.ResourceType.Name, resourceTypeID)
-	} else {
-		resourceTypeID = request.Update.ResourceType.Uuid
-		log.Infof("resource type id from request is %s", resourceTypeID)
+	// Begin a transaction.
+	tx, err := d.Begin()
+	if err != nil {
+		response.Error = errors.NatsError(ctx, err)
+		return response
 	}
-
-	// Get the operation id if it's not provided.
-	if request.Update.Operation.Uuid == "" {
-		log.Infof("getting operation ID for %s", request.Update.Operation.Name)
-		operationID, err = d.GetOperationID(
-			ctx,
-			request.Update.Operation.Name,
-		)
-		if err != nil {
-			response.Error = errors.NatsError(ctx, err)
-			return response
+	err = tx.Wrap(func() error {
+		// Get the userID if it's not provided
+		if request.Update.User.Uuid == "" {
+			log.Infof("getting user ID for %s", username)
+			user, err := d.EnsureUser(ctx, username, db.WithTX(tx))
+			if err != nil {
+				return err
+			}
+			userID = user.ID
+			log.Infof("user ID for %s is %s", username, userID)
+		} else {
+			userID = request.Update.User.Uuid
+			log.Infof("user ID from request is %s", userID)
 		}
-		log.Infof("operation ID for %s is %s", request.Update.Operation.Name, operationID)
-	} else {
-		operationID = request.Update.Operation.Uuid
-		log.Infof("using operation ID %s from request", request.Update.Operation.Uuid)
-	}
 
-	// construct the model.Update
-	if response.Error == nil {
+		// Get the resource type id if it's not provided.
+		if request.Update.ResourceType.Uuid == "" {
+			log.Infof("getting resource type id for resource '%s'", request.Update.ResourceType.Name)
+			resourceTypeID, err = d.GetResourceTypeID(
+				ctx,
+				request.Update.ResourceType.Name,
+				request.Update.ResourceType.Unit,
+				db.WithTX(tx),
+			)
+			if err != nil {
+				return err
+			}
+			log.Infof("resource type id for resource %s is '%s'", request.Update.ResourceType.Name, resourceTypeID)
+		} else {
+			resourceTypeID = request.Update.ResourceType.Uuid
+			log.Infof("resource type id from request is %s", resourceTypeID)
+		}
+
+		// Get the operation id if it's not provided.
+		if request.Update.Operation.Uuid == "" {
+			log.Infof("getting operation ID for %s", request.Update.Operation.Name)
+			operationID, err = d.GetOperationID(
+				ctx,
+				request.Update.Operation.Name,
+				db.WithTX(tx),
+			)
+			if err != nil {
+				return err
+			}
+			log.Infof("operation ID for %s is %s", request.Update.Operation.Name, operationID)
+		} else {
+			operationID = request.Update.Operation.Uuid
+			log.Infof("using operation ID %s from request", request.Update.Operation.Uuid)
+		}
+
+		// Construct the model.Update
 		update = &db.Update{
 			ValueType:     request.Update.ValueType,
 			Value:         request.Update.Value,
 			EffectiveDate: request.Update.EffectiveDate.AsTime(),
 			ResourceType: db.ResourceType{
-				ID:   resourceTypeID,
-				Name: request.Update.ResourceType.Name,
-				Unit: request.Update.ResourceType.Unit,
+				ID:         resourceTypeID,
+				Name:       request.Update.ResourceType.Name,
+				Unit:       request.Update.ResourceType.Unit,
 				Consumable: request.Update.ResourceType.Consumable,
 			},
 			User: db.User{
@@ -316,60 +324,68 @@ func (a *App) addUserUpdate(ctx context.Context, request *qms.AddUpdateRequest) 
 			Metadata: request.Update.Metadata,
 		}
 
+		// Add the update to the database. AddUserUpdate will populate the structure with the update ID.
 		log.Info("adding update to the database")
-		_, err = d.AddUserUpdate(ctx, update)
+		_, err = d.AddUserUpdate(ctx, update, db.WithTX(tx))
 		if err != nil {
-			response.Error = errors.NatsError(ctx, err)
-			return response
+			return err
 		}
 		log.Info("done adding update to the database")
 
+		// Process the update.
 		switch update.ValueType {
 		case db.UsagesTrackedMetric:
 			log.Info("processing update for usage")
-			if err = d.ProcessUpdateForUsage(ctx, update); err != nil {
-				response.Error = errors.NatsError(ctx, err)
-				return response
+			if err = d.ProcessUpdateForUsage(ctx, update, db.WithTX(tx)); err != nil {
+				return err
 			}
 			log.Info("after processing update for usage")
 
 		case db.QuotasTrackedMetric:
 			log.Info("processing update for quota")
-			if err = d.ProcessUpdateForQuota(ctx, update); err != nil {
-				response.Error = errors.NatsError(ctx, err)
-				return response
+			if err = d.ProcessUpdateForQuota(ctx, update, db.WithTX(tx)); err != nil {
+				return err
 			}
 			log.Info("after processing update for quota")
 
 		default:
-			err = fmt.Errorf("unknown value type in update: %s", update.ValueType)
-			response.Error = errors.NatsError(ctx, err)
-			return response
+			return fmt.Errorf("unknown value type in update: %s", update.ValueType)
 		}
 
-		// Set up the object for the response.
+		// Look up the recorded update and store it in the response.
+		recordedUpdate, err := d.GetUserUpdate(ctx, update.ID, db.WithTX(tx))
+		if err != nil {
+			return err
+		}
+		if recordedUpdate == nil {
+			return fmt.Errorf("unable to find the user upate after recording it: %s", update.ID)
+		}
 		response.Update = &qms.Update{
-			Uuid:      update.ID,
-			ValueType: update.ValueType,
-			Value:     update.Value,
+			Uuid:      recordedUpdate.ID,
+			ValueType: recordedUpdate.ValueType,
+			Value:     recordedUpdate.Value,
 			ResourceType: &qms.ResourceType{
-				Uuid: update.ResourceType.ID,
-				Name: update.ResourceType.Name,
-				Unit: update.ResourceType.Unit,
-				Consumable: update.ResourceType.Consumable,
+				Uuid:       recordedUpdate.ResourceType.ID,
+				Name:       recordedUpdate.ResourceType.Name,
+				Unit:       recordedUpdate.ResourceType.Unit,
+				Consumable: recordedUpdate.ResourceType.Consumable,
 			},
-			EffectiveDate: timestamppb.New(update.EffectiveDate),
+			EffectiveDate: timestamppb.New(recordedUpdate.EffectiveDate),
 			Operation: &qms.UpdateOperation{
-				Uuid: update.UpdateOperation.ID,
-				Name: update.UpdateOperation.Name,
+				Uuid: recordedUpdate.UpdateOperation.ID,
+				Name: recordedUpdate.UpdateOperation.Name,
 			},
 			User: &qms.QMSUser{
 				Uuid:     update.User.ID,
 				Username: update.User.Username,
 			},
 		}
-	}
 
+		return nil
+	})
+	if err != nil {
+		response.Error = errors.NatsError(ctx, err)
+	}
 	return response
 }
 
