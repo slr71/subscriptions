@@ -25,6 +25,10 @@ var (
 	ErrSubscriptionAddonsExist = errors.New("subscription add-ons exist")
 )
 
+func New(s string) error {
+	return errors.New(s)
+}
+
 func HTTPStatusCode(err error) int {
 	switch err {
 	case ErrUserNotFound:
