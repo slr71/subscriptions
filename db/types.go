@@ -576,9 +576,10 @@ func (a *Addon) ToQMSType() *qms.Addon {
 		DefaultAmount: a.DefaultAmount,
 		DefaultPaid:   a.DefaultPaid,
 		ResourceType: &qms.ResourceType{
-			Uuid: a.ResourceType.ID,
-			Name: a.ResourceType.Name,
-			Unit: a.ResourceType.Unit,
+			Uuid:       a.ResourceType.ID,
+			Name:       a.ResourceType.Name,
+			Unit:       a.ResourceType.Unit,
+			Consumable: a.ResourceType.Consumable,
 		},
 		AddonRates: addonRates,
 	}
