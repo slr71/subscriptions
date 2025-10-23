@@ -358,7 +358,7 @@ func (a *App) addUserUpdate(ctx context.Context, request *qms.AddUpdateRequest) 
 			return err
 		}
 		if recordedUpdate == nil {
-			return fmt.Errorf("unable to find the user upate after recording it: %s", update.ID)
+			return fmt.Errorf("unable to find the user update after recording it: %s", update.ID)
 		}
 		response.Update = &qms.Update{
 			Uuid:      recordedUpdate.ID,
