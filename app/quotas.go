@@ -18,22 +18,45 @@ func (a *App) addQuota(ctx context.Context, request *qms.AddQuotaRequest) *qms.Q
 	subscriptionID := request.Quota.SubscriptionId
 
 	d := db.New(a.db)
-
-	if err = d.UpsertQuota(ctx, float64(request.Quota.Quota), request.Quota.ResourceType.Uuid, subscriptionID); err != nil {
-		response.Error = errors.NatsError(ctx, err)
-		return response
-	}
-
-	value, _, err := d.GetCurrentQuota(ctx, request.Quota.ResourceType.Uuid, subscriptionID)
+	tx, err := d.Begin()
 	if err != nil {
 		response.Error = errors.NatsError(ctx, err)
 		return response
 	}
+	err = tx.Wrap(func() error {
+		var err error
 
-	response.Quota = &qms.Quota{
-		Quota:          value,
-		ResourceType:   request.Quota.ResourceType,
-		SubscriptionId: subscriptionID,
+		// Store the quota in the database, overwriting the old quota if one exists for the resource type.
+		err = d.UpsertQuota(
+			ctx,
+			float64(request.Quota.Quota),
+			request.Quota.ResourceType.Uuid,
+			subscriptionID,
+			db.WithTX(tx),
+		)
+		if err != nil {
+			return err
+		}
+
+		// Load the quota from the database.
+		quota, err := d.LoadQuotaDetails(ctx,
+			request.Quota.ResourceType.Uuid,
+			subscriptionID,
+			db.WithTX(tx),
+		)
+		if err != nil {
+			return err
+		}
+		if quota == nil {
+			return errors.New("unable to load the quota after saving")
+		}
+
+		// Save the quota in the response.
+		response.Quota = quota.ToQMSQuota()
+		return nil
+	})
+	if err != nil {
+		response.Error = errors.NatsError(ctx, err)
 	}
 
 	return response

@@ -193,6 +193,7 @@ func (a *App) getPlan(ctx context.Context, request *qms.PlanRequest) *qms.PlanRe
 					Uuid: q.ResourceType.ID,
 					Name: q.ResourceType.Name,
 					Unit: q.ResourceType.Unit,
+					Consumable: q.ResourceType.Consumable,
 				},
 			})
 	}

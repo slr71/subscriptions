@@ -32,6 +32,7 @@ func (d *Database) GetUserOverages(ctx context.Context, username string, opts ..
 			t.ResourceTypes.Col("id").As(goqu.C("resource_types.id")),
 			t.ResourceTypes.Col("name").As(goqu.C("resource_types.name")),
 			t.ResourceTypes.Col("unit").As(goqu.C("resource_types.unit")),
+			t.ResourceTypes.Col("consumable").As(goqu.C("resource_types.consumable")),
 
 			t.Quotas.Col("quota").As("quota_value"),
 			t.Usages.Col("usage").As("usage_value"),

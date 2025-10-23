@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 
+	t "github.com/cyverse-de/subscriptions/db/tables"
 	"github.com/doug-martin/goqu/v9"
 )
 
@@ -39,6 +40,47 @@ func (d *Database) GetCurrentQuota(ctx context.Context, resourceTypeID, subscrip
 	}
 
 	return quotaValue, quotaFound, nil
+}
+
+// LoadQuotaDetails retrieves details about a quota from the database.
+func (d *Database) LoadQuotaDetails(
+	ctx context.Context,
+	resourceTypeID, subscriptionID string,
+	opts ...QueryOption,
+) (*Quota, error) {
+	_, db := d.querySettings(opts...)
+
+	// Build the query.
+	query := db.From(t.Quotas).
+		Select(
+			t.Quotas.Col("id").As("id"),
+			t.Quotas.Col("quota").As("quota"),
+			t.Quotas.Col("created_by").As("created_by"),
+			t.Quotas.Col("created_at").As("created_at"),
+			t.Quotas.Col("last_modified_by").As("last_modified_by"),
+			t.Quotas.Col("last_modified_at").As("last_modified_at"),
+			t.RT.Col("id").As(goqu.C("resource_types.id")),
+			t.RT.Col("name").As(goqu.C("resource_types.name")),
+			t.RT.Col("unit").As(goqu.C("resource_types.unit")),
+			t.RT.Col("consumable").As(goqu.C("resource_types.consumable")),
+		).
+		Join(t.RT, goqu.On(goqu.I("quotas.resource_type_id").Eq(goqu.I("resource_types.id")))).
+		Where(goqu.And(
+			goqu.I("resource_type_id").Eq(resourceTypeID),
+			goqu.I("subscription_id").Eq(subscriptionID),
+		))
+
+	// Execute the query.
+	var quota Quota
+	found, err := query.Executor().ScanStructContext(ctx, &quota)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, nil
+	}
+
+	return &quota, nil
 }
 
 // UpsertQuota inserts or updates a quota into the database for the given
